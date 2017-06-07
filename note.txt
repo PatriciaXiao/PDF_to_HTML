@@ -10,3 +10,6 @@ https://pdftables.com/pdf-to-excel-api
 
 PDF syntax
 https://gendignoux.com/blog/2016/10/04/pdf-basics.html
+
+decode
+http://wklken.me/posts/2013/08/31/python-extra-coding-intro.html
