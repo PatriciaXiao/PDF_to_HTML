@@ -7,3 +7,6 @@ https://www.zhihu.com/question/39799085
 http://pybrary.net/pyPdf/
 
 https://pdftables.com/pdf-to-excel-api
+
+PDF syntax
+https://gendignoux.com/blog/2016/10/04/pdf-basics.html
