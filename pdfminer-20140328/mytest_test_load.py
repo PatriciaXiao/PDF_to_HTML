@@ -18,7 +18,7 @@ import re
 #打开一个pdf文件
 # fp = open(u'../test/simple1.PDF', 'rb') # also works (have to be like this when name include Chinese characters)
 fp = open('../test/simple1.PDF', 'rb')
-ofname = '../test/simple1_content2.txt'
+ofname = 'simple1_content.txt'
 #创建一个PDF文档解析器对象
 parser = PDFParser(fp)
 #创建一个PDF文档对象存储文档结构
@@ -44,7 +44,6 @@ interpreter = PDFPageInterpreter(rsrcmgr, device)
 #PDFPage.create_pages(document) 获取page列表的另一种方式
 replace=re.compile(r'\s+');
 # 循环遍历列表，每次处理一个page的内容
-'''
 page_idx = 1
 for page in PDFPage.create_pages(document):
     # print "****** page " + str(page_idx) + " ******"
@@ -61,31 +60,5 @@ for page in PDFPage.create_pages(document):
             text=re.sub(replace,'',x.get_text())
             if len(text)!=0:
                 print text
-                if isinstance(text, unicode):
-                    print "this is unicode"
-                elif isinstance(text, str):
-                    print "this is str"
-'''
-
-
-page_idx = 1
-with open(ofname, 'a') as of:
-
-    for page in PDFPage.create_pages(document):
-        print "****** page " + str(page_idx) + " ******"
-        page_idx += 1
-        interpreter.process_page(page)
-        # 接受该页面的LTPage对象
-        layout=device.get_result()
-        # 这里layout是一个LTPage对象 里面存放着 这个page解析出的各种对象
-        # 一般包括LTTextBox, LTFigure, LTImage, LTTextBoxHorizontal 等等
-        
-        for x in layout:
-            #如果x是水平文本对象的话
-            if(isinstance(x,LTTextBoxHorizontal)):
-                text=re.sub(replace,'',x.get_text())
-                if len(text)!=0:
-                    of.write(text.encode('utf-8') + '\n')
-
 
 fp.close()
