@@ -13,3 +13,5 @@ https://gendignoux.com/blog/2016/10/04/pdf-basics.html
 
 decode
 http://wklken.me/posts/2013/08/31/python-extra-coding-intro.html
+
+http://www.cnblogs.com/fkissx/p/5417363.html
