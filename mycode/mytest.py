@@ -17,8 +17,8 @@ import re
 
 #打开一个pdf文件
 # fp = open(u'../test/simple1.PDF', 'rb') # also works (have to be like this when name include Chinese characters)
-fp = open('../test/simple1.PDF', 'rb')
-ofname = '../test/simple1_content2.txt'
+fp = open('data/simple1.PDF', 'rb')
+ofname = 'data/simple1_content2.txt'
 #创建一个PDF文档解析器对象
 parser = PDFParser(fp)
 #创建一个PDF文档对象存储文档结构
@@ -64,26 +64,36 @@ with open(ofname, 'w') as of:
         print rsrcmgr._cached_fonts
         '''
         # raw_input()
+        print "page x(" + str(layout.x0) + ", " + str(layout.x1) + ")"
+        print "page y(" + str(layout.y0) + ", " + str(layout.y1) + ")"
         for x in layout:
             #如果x是文本对象的话
             # if(isinstance(x, LTTextBoxHorizontal)):
             if(isinstance(x, LTTextBoxHorizontal)):
-                # print x
-                # print x.size
+                
                 for line in x:
-                    print line # LTTextLineHorizontal
+                    # print line # LTTextLineHorizontal
                     for char in line:
                         if isinstance(char, LTAnno):
                             print char
                         else:
                             print char.size #LTAnno 没有size属性
-                        # raw_input()
+                            print char.fontname #ABCDEE-黑体 即加粗 ABCDEE-宋体 即不加粗
+                            ###
+                            print char.adv
+                            print char.matrix
+                            ###
+                            print "x(" + str(char.x0) + ", " + str(char.x1) + ")"
+                            print "y(" + str(char.y0) + ", " + str(char.y1) + ")"
+                            print "width:" + str(char.width) + ", height:" + str(char.height)
+                            raw_input()
                         break
+                
                 text=re.sub(replace,'',x.get_text())
                 if len(text)!=0:
-                    # of.write(text.encode('utf-8') + '\n')
-                    print text
-                    raw_input()
+                    #print text
+                    #raw_input()
+                    of.write(text.encode('utf-8') + '\n')
 
 
 fp.close()

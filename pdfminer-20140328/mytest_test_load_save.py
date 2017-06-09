@@ -30,8 +30,7 @@ if not document.is_extractable:
     raise PDFTextExtractionNotAllowed
 #创建一个PDF资源管理器对象来存储共享资源
 #caching = False不缓存
-# rsrcmgr = PDFResourceManager(caching = False)
-rsrcmgr = PDFResourceManager()
+rsrcmgr = PDFResourceManager(caching = False)
 # 创建一个PDF设备对象
 laparams = LAParams()
 # 创建一个PDF页面聚合对象
@@ -45,9 +44,33 @@ interpreter = PDFPageInterpreter(rsrcmgr, device)
 #PDFPage.create_pages(document) 获取page列表的另一种方式
 replace=re.compile(r'\s+');
 # 循环遍历列表，每次处理一个page的内容
+'''
 page_idx = 1
-# with open(ofname, 'a') as of:
-with open(ofname, 'w') as of:
+for page in PDFPage.create_pages(document):
+    # print "****** page " + str(page_idx) + " ******"
+    page_idx += 1
+    interpreter.process_page(page)
+    # 接受该页面的LTPage对象
+    layout=device.get_result()
+    # 这里layout是一个LTPage对象 里面存放着 这个page解析出的各种对象
+    # 一般包括LTTextBox, LTFigure, LTImage, LTTextBoxHorizontal 等等
+    
+    for x in layout:
+        #如果x是水平文本对象的话
+        if(isinstance(x,LTTextBoxHorizontal)):
+            text=re.sub(replace,'',x.get_text())
+            if len(text)!=0:
+                print text
+                if isinstance(text, unicode):
+                    print "this is unicode"
+                elif isinstance(text, str):
+                    print "this is str"
+'''
+
+
+page_idx = 1
+with open(ofname, 'a') as of:
+
     for page in PDFPage.create_pages(document):
         print "****** page " + str(page_idx) + " ******"
         page_idx += 1
@@ -56,35 +79,13 @@ with open(ofname, 'w') as of:
         layout=device.get_result()
         # 这里layout是一个LTPage对象 里面存放着 这个page解析出的各种对象
         # 一般包括LTTextBox, LTFigure, LTImage, LTTextBoxHorizontal 等等
-
-        # print interpreter.textstate
-        # print interpreter.fontmap
-        '''
-        print rsrcmgr.caching
-        print rsrcmgr._cached_fonts
-        '''
-        # raw_input()
+        
         for x in layout:
-            #如果x是文本对象的话
-            # if(isinstance(x, LTTextBoxHorizontal)):
-            if(isinstance(x, LTTextBoxHorizontal)):
-                # print x
-                # print x.size
-                for line in x:
-                    print line # LTTextLineHorizontal
-                    for char in line:
-                        if isinstance(char, LTAnno):
-                            print char
-                        else:
-                            print char.size #LTAnno 没有size属性
-                        # raw_input()
-                        break
+            #如果x是水平文本对象的话
+            if(isinstance(x,LTTextBoxHorizontal)):
                 text=re.sub(replace,'',x.get_text())
                 if len(text)!=0:
-                    # of.write(text.encode('utf-8') + '\n')
-                    print text
-                    raw_input()
+                    of.write(text.encode('utf-8') + '\n')
 
 
 fp.close()
-of.close()
