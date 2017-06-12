@@ -10,10 +10,13 @@ from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.layout import *
 import re
+
 import sys
 
 reload(sys)
 sys.setdefaultencoding('utf8') #设置默认编码
+# sys.getdefaultencoding() #'ascii'
+
 
 class PDF2HTML(object):
 	def __init__(self, pdf_path, html_path, password="", codec='utf-8'):
@@ -43,6 +46,9 @@ class PDF2HTML(object):
 
 	def write(self, content):
 		self.writer.write(self.level * self.indent + str(content).encode('utf-8') + '\n')
+
+	def encode(self, content, codec = 'utf-8'):
+		return 
 
 	def convert(self):
 		pass
@@ -119,8 +125,30 @@ class simplePDF2HTML(PDF2HTML):
 			# print page_xrange, page_yrange
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
+					fontname, fontsize, location = self.get_font(x)
 					text=re.sub(self.replace,'',x.get_text())
-					self.write('<p>{0}</p>'.format(text))
+					# tmp = u'ABCDEE+黑体'.encode('gbk') #.encode('utf-8')
+					tmp = u'{0}'.format('ABCDEE+黑体').encode('gbk')
+					if fontname == tmp:
+						print u'黑体'
+					# else:
+					#	print fontname + " is not: " + tmp 
+					self.write('<p style="font-size:{0}px;">{1}</p>'.format(fontsize, text))
 			page_idx += 1
 		self.level -= 1
 		self.write('</body>')
+
+
+	def get_font(self, x):
+		for line in x:
+			# print line # LTTextLineHorizontal
+			for char in line:
+				if isinstance(char, LTAnno):
+					# print char
+					return None, None #LTAnno 没有size属性
+				else:
+					fontsize = char.size
+					fontname = char.fontname #ABCDEE-黑体 即加粗 ABCDEE-宋体 即不加粗
+					location = (char.x0, char.x1)
+					return fontname, fontsize, location
+					break
