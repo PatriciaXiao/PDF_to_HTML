@@ -256,7 +256,7 @@ class simplePDF2HTML(PDF2HTML):
 			# print "font"
 			return True
 		total_width = page_xrange[1] - page_xrange[0]
-		threshold = 0.7
+		threshold = 0.5
 		if line_width < threshold * total_width:
 			# print "shorter than usual"
 			return True
