@@ -91,6 +91,7 @@ with open(ofname, 'w') as of:
                         break
                 
                 text=re.sub(replace,'',x.get_text())
+                print text
                 # text = x.get_text()
                 if len(text)!=0:
                     #print text
