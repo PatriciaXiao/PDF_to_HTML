@@ -23,8 +23,9 @@ ofname = 'data/simple1_content2.txt'
 parser = PDFParser(fp)
 #创建一个PDF文档对象存储文档结构
 #提供密码初始化，没有就不用传该参数
-#document = PDFDocument(parser, password)
-document = PDFDocument(parser)
+password = ""
+document = PDFDocument(parser, password)
+# document = PDFDocument(parser)
 #检查文件是否允许文本提取
 if not document.is_extractable:
     raise PDFTextExtractionNotAllowed
@@ -86,10 +87,11 @@ with open(ofname, 'w') as of:
                             print "x(" + str(char.x0) + ", " + str(char.x1) + ")"
                             print "y(" + str(char.y0) + ", " + str(char.y1) + ")"
                             print "width:" + str(char.width) + ", height:" + str(char.height)
-                            raw_input()
+                            # raw_input()
                         break
                 
                 text=re.sub(replace,'',x.get_text())
+                # text = x.get_text()
                 if len(text)!=0:
                     #print text
                     #raw_input()
