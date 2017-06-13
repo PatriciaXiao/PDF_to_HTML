@@ -10,6 +10,7 @@ from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.layout import *
 import re
+import operator # 为了排序
 
 import sys, gc
 
@@ -41,7 +42,8 @@ class PDF2HTML(object):
 			self.chinese_str('？'), 
 			self.chinese_str('?'),
 			self.chinese_str('！'), 
-			self.chinese_str('!')
+			self.chinese_str('!'),
+			self.chinese_str('；')
 		]
 		# print "init"
 	def __enter__(self):
@@ -69,6 +71,9 @@ class PDF2HTML(object):
 	def get_last_char(self, content):
 		length = len(content)
 		return content[length - 1:]
+
+	def sort_dict_by_val(self, dictdata, reverse=True):
+		return sorted(dictdata.items(), key=operator.itemgetter(1), reverse=reverse)
 
 	def convert(self):
 		pass
@@ -148,15 +153,17 @@ class simplePDF2HTML(PDF2HTML):
 			page_xrange = (layout.x0, layout.x1)
 			page_yrange = (layout.y0, layout.y1)
 			# print page_xrange, page_yrange
-			content_xrange = self.get_indent_info(layout, page_xrange)
+			content_xrange, indent_list, fontsize_list = self.get_indent_info(layout, page_xrange)
 			content_width = content_xrange[1] - content_xrange[0]
+			major_indents, map_indents, major_size = self.get_conclude(indent_list, fontsize_list)
+			raw_input()
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					fontname, fontsize, location, line_width = self.get_font(x)
 					text=re.sub(self.replace,'',x.get_text())
 					# text = x.get_text()
 					fontweight = self.fontweight_dict[fontname]
-					align = self.get_align(content_xrange, location, line_width, debug=text)
+					align = self.get_align(content_xrange, location, line_width, fontsize, major_size, debug=text)
 					if prev_text:
 						last_char = self.get_last_char(prev_text)
 						para_end = self.if_para_end(prev_content_width, prev_linewidth, last_char, \
@@ -197,21 +204,14 @@ class simplePDF2HTML(PDF2HTML):
 		default_fontname = self.chinese_str('ABCDEE+宋体')
 		for line in x:
 			line_width = line.width
-			line_height = line.height
-			location = (line.x0, line.x1)
-
-			'''
-			print line.width
-			print line.get_text()
-			raw_input()
-			'''
+			line_height = round(line.height)
+			location = (round(line.x0), round(line.x1))
 			# print line # LTTextLineHorizontal
-			# print line.x0, line.x1
 			for char in line:
 				if isinstance(char, LTAnno):
 					continue
 				else:
-					fontsize = char.size
+					fontsize = round(char.size)
 					fontname = char.fontname #ABCDEE-黑体 即加粗 ABCDEE-宋体 即不加粗
 					if fontname in self.fontweight_dict.keys():
 						return fontname, fontsize, location, line_width
@@ -220,6 +220,8 @@ class simplePDF2HTML(PDF2HTML):
 	def get_indent_info(self, layout, page_xrange):
 		most_left = page_xrange[1]
 		most_right = page_xrange[0]
+		indent_list = {}
+		fontsize_list = {}
 		for x in layout:
 			if(isinstance(x, LTTextBoxHorizontal)):
 				fontname, fontsize, location, line_width = self.get_font(x)
@@ -227,25 +229,62 @@ class simplePDF2HTML(PDF2HTML):
 					most_left = location[0]
 				if location[1] > most_right:
 					most_right = location[1]
-		return (most_left, most_right)
+				if fontsize in fontsize_list.keys():
+					fontsize_list[fontsize] += 1
+				else:
+					fontsize_list[fontsize] = 1
+				indent = location[0]
+				if indent in indent_list.keys():
+					indent_list[indent] += 1
+				else:
+					indent_list[indent] = 1
+		return (most_left, most_right), indent_list, fontsize_list
 
-	def get_align(self, content_xrange, location, line_width, debug=None):
-		threshold = 0.95
-		ratio_lim = 1.5
+	def if_close_to(self, src, dst, threshold = 0.1):
+		if (src >= dst * (1 - threshold)) and (src <= dst * (1 + threshold)):
+			return True
+		return False
+
+	def get_conclude(self, indent_list, fontsize_list):
+		sorted_indents = self.sort_dict_by_val(indent_list)
+		sorted_sizes = self.sort_dict_by_val(fontsize_list)
+		mapping_list = {}
+		for key in indent_list.keys():
+			mapping_list[key] = key
+		max_amount_indent = sorted_indents[0][0]
+		max_amount_indent_2 = -1
+		for item in sorted_indents[1:]:
+			if self.if_close_to(item[0], max_amount_indent):
+				mapping_list[item[0]] = max_amount_indent
+			else:
+				if max_amount_indent_2 == -1: # 尚未决定第二缩进
+					max_amount_indent_2 = item[0]
+				else:
+					if self.if_close_to(item[0], max_amount_indent_2):
+						mapping_list[item[0]] = max_amount_indent_2
+					else:
+						break
+		max_amount_size = sorted_sizes[0][0]
+		return (max_amount_indent, max_amount_indent_2), mapping_list, max_amount_size
+
+	def get_align(self, content_xrange, location, line_width, fontsize, major_size, debug=None):
+		threshold = 0.9
+		ratio_lim = 0.67
 		width_lim = 0.7
+		size_threshold = 1.2
 		percentage = line_width / (content_xrange[1] - content_xrange[0])
 		delta_left = location[0] - content_xrange[0]
 		delta_right = content_xrange[1] - location[1]
 		delta1 = max(delta_left, delta_right)
 		delta2 = min(delta_left, delta_right)
 		ratio = None
-		if delta2 != 0:
-			ratio = delta1 / delta2
-		else: # delta1 <= delta2 = 0
+		if delta1 != 0:
+			ratio = delta2 / delta1
+		else: # delta2 <= delta1 = 0
 			return "left"
-		if ratio <= ratio_lim and percentage < threshold:
+		if ratio >= ratio_lim and (percentage < threshold or fontsize > major_size * size_threshold):
 			return "center"
-		if ratio > ratio_lim and percentage < width_lim:
+		if ratio < ratio_lim and percentage < width_lim:
 			if delta_left < delta_right:
 				return "left"
 			else:
@@ -255,35 +294,29 @@ class simplePDF2HTML(PDF2HTML):
 	def if_para_end(self, max_width, line_width, last_char, \
 			prev_size, prev_weight, prev_align, fontsize, fontweight, align, \
 			debug = None):
-		# print prev_size, prev_weight, prev_align, fontsize, fontweight, align
-		'''
-		print prev_location, page_xrange, most_right
-		print debug
-		raw_input()
-		'''
-		# print last_char
-		# raw_input()
 
 		threshold = 0.9
-		#raw_input()
-		print line_width,  threshold * max_width
-		print debug
 
 		# 如果是居中或者居右，直接换行
 		if prev_align == "center" or prev_align == "right":
 			print "location"
 			return True
 		# 以下居左
-		# 如果居左且比较短 
+		# 如果居左且比较短，直接换行
 		if line_width < threshold * max_width:
 			print "shorter than usual"
 			return True
+		# 如果对齐方式不一样，可以直接换行
 		if prev_align != align:
 			print "alignment difference"
 			return True
+
+		# 对齐方式一样，足够长，居左，但是结尾并不是完结符，不换行
 		if last_char not in self.endmark_list:
+			print "no end mark"
 			return False
 		
+		# 结尾是完结符，对齐方式一样，够长，居左，如果字体大小和粗细不一样可以换行
 		if prev_size != fontsize:
 			print "size difference"
 			return True
