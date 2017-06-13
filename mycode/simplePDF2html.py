@@ -68,7 +68,7 @@ class PDF2HTML(object):
 
 	def get_last_char(self, content):
 		length = len(content)
-		return content[length - 2:]
+		return content[length - 1:]
 
 	def convert(self):
 		pass
@@ -148,23 +148,20 @@ class simplePDF2HTML(PDF2HTML):
 			page_xrange = (layout.x0, layout.x1)
 			page_yrange = (layout.y0, layout.y1)
 			# print page_xrange, page_yrange
-			most_left, most_right = self.get_indent_info(layout, page_xrange)
+			content_xrange = self.get_indent_info(layout, page_xrange)
+			content_width = content_xrange[1] - content_xrange[0]
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					fontname, fontsize, location, line_width = self.get_font(x)
 					text=re.sub(self.replace,'',x.get_text())
+					# text = x.get_text()
 					fontweight = self.fontweight_dict[fontname]
-					align = self.get_align(page_xrange, location, most_left, most_right, text)
-					'''
-					print location
-					print page_xrange
-					print text
-					raw_input()
-					'''
+					align = self.get_align(content_xrange, location, line_width, debug=text)
 					if prev_text:
 						last_char = self.get_last_char(prev_text)
-						para_end = self.if_para_end(page_xrange, prev_linewidth, last_char, \
-							 prev_size, prev_weight, prev_align, fontsize, fontweight, align)	
+						para_end = self.if_para_end(prev_content_width, prev_linewidth, last_char, \
+							 prev_size, prev_weight, prev_align, fontsize, fontweight, align, \
+							 debug = prev_text)	
 					if para_end:
 						# self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
 						# 		text, fontsize, fontweight, align
@@ -178,12 +175,14 @@ class simplePDF2HTML(PDF2HTML):
 					if prev_text:
 						prev_text = prev_text + text
 						prev_linewidth = line_width
+						prev_content_width = content_width
 					else:
 						prev_text = text
 						prev_size = fontsize
 						prev_weight = fontweight
 						prev_align = align
 						prev_linewidth = line_width
+						prev_content_width = content_width
 			page_idx += 1
 		
 		if prev_text:
@@ -228,50 +227,67 @@ class simplePDF2HTML(PDF2HTML):
 					most_left = location[0]
 				if location[1] > most_right:
 					most_right = location[1]
-		return most_left, most_right
+		return (most_left, most_right)
 
-	def get_align(self, page_xrange, location, most_left, most_right, debug=None):
-		threshold = 2.
-		left_padding = location[0] - page_xrange[0]
-		right_padding = page_xrange[1] - location[1]
-		delta_left = most_left - page_xrange[0]
-		delta_right = page_xrange[1] - most_right
-		if left_padding < threshold * delta_left:
+	def get_align(self, content_xrange, location, line_width, debug=None):
+		threshold = 0.95
+		ratio_lim = 1.5
+		width_lim = 0.7
+		percentage = line_width / (content_xrange[1] - content_xrange[0])
+		delta_left = location[0] - content_xrange[0]
+		delta_right = content_xrange[1] - location[1]
+		delta1 = max(delta_left, delta_right)
+		delta2 = min(delta_left, delta_right)
+		ratio = None
+		if delta2 != 0:
+			ratio = delta1 / delta2
+		else: # delta1 <= delta2 = 0
 			return "left"
-		elif right_padding < threshold * delta_right:
-			return "right"
-		else:
+		if ratio <= ratio_lim and percentage < threshold:
 			return "center"
+		if ratio > ratio_lim and percentage < width_lim:
+			if delta_left < delta_right:
+				return "left"
+			else:
+				return "right"
+		return "left"
 
-	def if_para_end(self, page_xrange, line_width, last_char, \
-			prev_size, prev_weight, prev_align, fontsize, fontweight, align):
+	def if_para_end(self, max_width, line_width, last_char, \
+			prev_size, prev_weight, prev_align, fontsize, fontweight, align, \
+			debug = None):
 		# print prev_size, prev_weight, prev_align, fontsize, fontweight, align
 		'''
 		print prev_location, page_xrange, most_right
 		print debug
 		raw_input()
 		'''
+		# print last_char
 		# raw_input()
+
+		threshold = 0.9
+		#raw_input()
+		print line_width,  threshold * max_width
+		print debug
+
+		# 如果是居中或者居右，直接换行
 		if prev_align == "center" or prev_align == "right":
-			# print "font"
+			print "location"
 			return True
-		total_width = page_xrange[1] - page_xrange[0]
-		threshold = 0.5
-		if line_width < threshold * total_width:
-			# print "shorter than usual"
+		# 以下居左
+		# 如果居左且比较短 
+		if line_width < threshold * max_width:
+			print "shorter than usual"
 			return True
 		if prev_align != align:
-			# print "alignment difference"
+			print "alignment difference"
 			return True
 		if last_char not in self.endmark_list:
 			return False
 		
 		if prev_size != fontsize:
-			# print "size difference"
+			print "size difference"
 			return True
 		if prev_weight != fontweight:
-			# print "weight difference"
+			print "weight difference"
 			return True
-		
-		
 		return False
