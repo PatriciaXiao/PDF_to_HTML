@@ -148,7 +148,7 @@ class simplePDF2HTML(PDF2HTML):
 		self.level += 1
 		# 循环遍历列表，每次处理一个page的内容
 		page_idx = 1
-		para_end = False
+		ended = False
 		prev_text = None
 		prev_size = None
 		prev_weight = None
@@ -163,9 +163,48 @@ class simplePDF2HTML(PDF2HTML):
 			page_yrange = (layout.y0, layout.y1)
 			# print page_xrange, page_yrange
 			content_xrange, indent_list, fontsize_list = self.get_indent_info(layout, page_xrange)
+			if len(indent_list) == 0 or len(fontsize_list) == 0: # 空白页
+				continue
 			content_width = content_xrange[1] - content_xrange[0]
 			major_indents, map_indents, major_size = self.get_conclude(indent_list, fontsize_list)
-			raw_input()
+			# raw_input()
+			for x in layout:
+				if(isinstance(x, LTTextBoxHorizontal)):
+					fontname, fontsize, location, line_width = self.get_font(x)
+					text=re.sub(self.replace,'',x.get_text())
+					# text = x.get_text()
+					fontweight = self.fontweight_dict[fontname]
+					actual_left = map_indents[location[0]]
+					align = self.get_align(content_xrange, location, line_width, fontsize, major_size, debug=text)
+					if (align == 'left'):
+						# 检测是否是一行的开头
+						ended = self.if_para_end(actual_left, major_indents)
+						if ended:
+							if prev_text:
+								self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
+										prev_text, prev_size, prev_weight, prev_align
+									))
+							ended = False
+							prev_text = None
+						# 准备传给下一次迭代
+						if prev_text:
+							prev_text = prev_text + text
+						else:
+							prev_text = text
+							prev_size = fontsize
+							prev_weight = fontweight
+							prev_align = align
+					else:
+						if prev_text:
+							self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
+									prev_text, prev_size, prev_weight, prev_align
+								))
+							prev_text = None
+						self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
+								text, fontsize, fontweight, align
+							))
+
+			'''
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					fontname, fontsize, location, line_width = self.get_font(x)
@@ -199,6 +238,7 @@ class simplePDF2HTML(PDF2HTML):
 						prev_align = align
 						prev_linewidth = line_width
 						prev_content_width = content_width
+			'''
 			page_idx += 1
 		
 		if prev_text:
@@ -277,7 +317,7 @@ class simplePDF2HTML(PDF2HTML):
 		return (max_amount_indent, max_amount_indent_2), mapping_list, max_amount_size
 
 	def get_align(self, content_xrange, location, line_width, fontsize, major_size, debug=None):
-		threshold = 0.9
+		threshold = 0.8
 		ratio_lim = 0.67
 		width_lim = 0.7
 		size_threshold = 1.2
@@ -300,6 +340,14 @@ class simplePDF2HTML(PDF2HTML):
 				return "right"
 		return "left"
 
+	def if_para_end(self, actual_left, major_indents):
+		min_indent = min(major_indents[0], major_indents[1])
+		if actual_left == min_indent:
+			return False
+		else:
+			return True
+
+	'''
 	def if_para_end(self, max_width, line_width, last_char, \
 			prev_size, prev_weight, prev_align, fontsize, fontweight, align, \
 			debug = None):
@@ -333,3 +381,4 @@ class simplePDF2HTML(PDF2HTML):
 			print "weight difference"
 			return True
 		return False
+	'''
