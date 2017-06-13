@@ -131,6 +131,15 @@ class simplePDF2HTML(PDF2HTML):
 		self.level += 1
 		self.write('<meta http-equiv="Content-Type" content="text/html; charset=%s">\n' % self.codec)
 		self.write('<title>PDF格式转HTML</title>')
+		self.write('<style>')
+		self.level += 1
+		self.write('p {')
+		self.level += 1
+		self.write('text-indent: 2.0em;')
+		self.level -= 1
+		self.write('};')
+		self.level -= 1
+		self.write('</style>')
 		self.level -= 1
 		self.write('</head>')
 
