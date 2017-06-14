@@ -131,6 +131,7 @@ class simplePDF2HTML(PDF2HTML):
 		self.level += 1
 		self.write('<meta http-equiv="Content-Type" content="text/html; charset=%s">\n' % self.codec)
 		self.write('<title>PDF格式转HTML</title>')
+		'''
 		self.write('<style>')
 		self.level += 1
 		self.write('p {')
@@ -140,6 +141,7 @@ class simplePDF2HTML(PDF2HTML):
 		self.write('};')
 		self.level -= 1
 		self.write('</style>')
+		'''
 		self.level -= 1
 		self.write('</head>')
 
@@ -152,7 +154,9 @@ class simplePDF2HTML(PDF2HTML):
 		prev_text = None
 		prev_size = None
 		prev_weight = None
+		prev_indent = None
 		prev_align = None
+		prev_length = None
 		for page in PDFPage.create_pages(self.document):
 			# print "page " + str(page_idx)
 			self.interpreter.process_page(page)
@@ -167,6 +171,7 @@ class simplePDF2HTML(PDF2HTML):
 				continue
 			content_width = content_xrange[1] - content_xrange[0]
 			major_indents, map_indents, major_size = self.get_conclude(indent_list, fontsize_list)
+			typical_length = content_width / major_size
 			# raw_input()
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
@@ -175,75 +180,45 @@ class simplePDF2HTML(PDF2HTML):
 					# text = x.get_text()
 					fontweight = self.fontweight_dict[fontname]
 					actual_left = map_indents[location[0]]
+					indent = self.get_indent(actual_left, major_indents)
 					align = self.get_align(content_xrange, location, line_width, fontsize, major_size, debug=text)
+					length = line_width / fontsize
 					if (align == 'left'):
-						# 检测是否是一行的开头
-						ended = self.if_para_end(actual_left, major_indents)
+						# 检测当前行是否是一行的开头，之前行是否已结尾
+						if prev_text == None:
+							prev_length = 0
+						ended = self.if_para_end(actual_left, major_indents, prev_length / typical_length)
 						if ended:
 							if prev_text:
-								self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
-										prev_text, prev_size, prev_weight, prev_align
+								self.write('<p style="font-size:{2}px;font-weight:{3};text-indent:{4}em;" align="{1}">{0}</p>'.format( \
+										prev_text, prev_align, prev_size, prev_weight, prev_indent
 									))
-							ended = False
 							prev_text = None
 						# 准备传给下一次迭代
 						if prev_text:
 							prev_text = prev_text + text
+							prev_length = length
 						else:
 							prev_text = text
 							prev_size = fontsize
 							prev_weight = fontweight
+							prev_indent = indent
 							prev_align = align
+							prev_length = length
 					else:
 						if prev_text:
-							self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
-									prev_text, prev_size, prev_weight, prev_align
+							self.write('<p style="font-size:{2}px;font-weight:{3};text-indent:{4}em;" align="{1}">{0}</p>'.format( \
+									prev_text, prev_align, prev_size, prev_weight, prev_indent
 								))
 							prev_text = None
-						self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
-								text, fontsize, fontweight, align
+						self.write('<p style="font-size:{2}px;font-weight:{3}text-indent:0.0em;" align="{1}">{0}</p>'.format( \
+								text, align, fontsize, fontweight
 							))
-
-			'''
-			for x in layout:
-				if(isinstance(x, LTTextBoxHorizontal)):
-					fontname, fontsize, location, line_width = self.get_font(x)
-					text=re.sub(self.replace,'',x.get_text())
-					# text = x.get_text()
-					fontweight = self.fontweight_dict[fontname]
-					align = self.get_align(content_xrange, location, line_width, fontsize, major_size, debug=text)
-					if prev_text:
-						last_char = self.get_last_char(prev_text)
-						para_end = self.if_para_end(prev_content_width, prev_linewidth, last_char, \
-							 prev_size, prev_weight, prev_align, fontsize, fontweight, align, \
-							 debug = prev_text)	
-					if para_end:
-						# self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
-						# 		text, fontsize, fontweight, align
-						# 	))
-						self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
-								prev_text, prev_size, prev_weight, prev_align
-							))
-						para_end = False
-						prev_text = None
-					
-					if prev_text:
-						prev_text = prev_text + text
-						prev_linewidth = line_width
-						prev_content_width = content_width
-					else:
-						prev_text = text
-						prev_size = fontsize
-						prev_weight = fontweight
-						prev_align = align
-						prev_linewidth = line_width
-						prev_content_width = content_width
-			'''
 			page_idx += 1
 		
 		if prev_text:
-			self.write('<p style="font-size:{1}px;font-weight:{2}" align="{3}">{0}</p>'.format( \
-					prev_text, prev_size, prev_weight, prev_align
+			self.write('<p style="font-size:{2}px;font-weight:{3};text-indent:{4}em;" align="{1}">{0}</p>'.format( \
+					prev_text, prev_align, prev_size, prev_weight, prev_indent
 				))
 		self.level -= 1
 		self.write('</body>')
@@ -265,6 +240,14 @@ class simplePDF2HTML(PDF2HTML):
 					if fontname in self.fontweight_dict.keys():
 						return fontname, fontsize, location, line_width
 			return default_fontname, line_height, location, line_width
+
+	def get_indent(self, actual_left, major_indents):
+		level_indent = max(major_indents[0], major_indents[1])
+		if actual_left == level_indent:
+			return 2.0
+		else:
+			return 0.0
+
 
 	def get_indent_info(self, layout, page_xrange):
 		most_left = page_xrange[1]
@@ -340,9 +323,13 @@ class simplePDF2HTML(PDF2HTML):
 				return "right"
 		return "left"
 
-	def if_para_end(self, actual_left, major_indents):
+	def if_para_end(self, actual_left, major_indents, ratio):
+		threshold = 0.7
 		min_indent = min(major_indents[0], major_indents[1])
 		if actual_left == min_indent:
+			# 除非此行比较短，否则认定为没有分段
+			if ratio < threshold:
+				return True
 			return False
 		else:
 			return True

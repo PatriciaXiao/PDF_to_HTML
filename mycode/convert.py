@@ -19,7 +19,7 @@ def get_PDF_fnames(directory):
 
 # fname_list = ['data/simple1.PDF', 'data/simple2.PDF', 'data/simple3.PDF']
 # fname_list = ['data/simple3.PDF']
-
+# fname_list = ['data/2016-01-19-1201924052.PDF']
 fname_list = get_PDF_fnames('data/')
 for fname in fname_list:
 	with simplePDF2HTML(fname, get_HTML_fname(fname)) as test:
