@@ -214,6 +214,10 @@ class simplePDF2HTML(PDF2HTML):
 						self.write('<p style="font-size:{2}px;font-weight:{3}text-indent:0.0em;" align="{1}">{0}</p>'.format( \
 								text, align, fontsize, fontweight
 							))
+				else:
+					print x
+					if isinstance(x, LTRect):
+						raw_input()
 			page_idx += 1
 		
 		if prev_text:
