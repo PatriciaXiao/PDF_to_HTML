@@ -183,6 +183,9 @@ class simplePDF2HTML(PDF2HTML):
 					indent = self.get_indent(actual_left, major_indents)
 					align = self.get_align(content_xrange, location, line_width, fontsize, major_size, debug=text)
 					length = line_width / fontsize
+					# print x.x0, x.x1, x.y0, x.y1
+					# print text
+					# raw_input()
 					if (align == 'left'):
 						# 检测当前行是否是一行的开头，之前行是否已结尾
 						if prev_text == None:
@@ -215,9 +218,15 @@ class simplePDF2HTML(PDF2HTML):
 								text, align, fontsize, fontweight
 							))
 				else:
-					print x
 					if isinstance(x, LTRect):
-						raw_input()
+						print "page {0}".format(page_idx)
+						print x
+						print x.x0, x.x1, x.y0, x.y1
+					else:
+						print "page {0}".format(page_idx)
+						print x
+						print x.x0, x.x1, x.y0, x.y1
+					raw_input()
 			page_idx += 1
 		
 		if prev_text:
