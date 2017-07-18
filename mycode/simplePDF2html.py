@@ -383,8 +383,16 @@ class simplePDF2HTML(PDF2HTML):
 		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		for x in layout:
 			if(isinstance(x, LTTextBoxHorizontal)):
-				for c in x:
-					print c
+				for line in x:
+					# print line # LTTextLine
+					for char in line:
+						# print char # LTChar / LTAnno
+						if isinstance(char, LTChar):
+							drawer.set_color("brown")
+							drawer.square(char.x0, char.x1, char.y1, char.y0)
+						elif isinstance(char, LTChar):
+							drawer.set_color("gray")
+							drawer.square(char.x0, char.x1, char.y1, char.y0)
 					#drawer.set_color("brown")
 					#drawer.square(c.x0, c.x1, c.y1, c.y0)
 				drawer.set_color("black")
