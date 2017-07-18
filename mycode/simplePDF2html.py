@@ -11,6 +11,7 @@ from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.layout import *
 import re
 import operator # 为了排序
+import turtle # 为了可视化显示检测到的布局
 
 import sys, gc
 
@@ -26,6 +27,7 @@ class PDF2HTML(object):
 		self.codec = codec
 		self.reader = open(pdf_path, 'rb')
 		self.writer = open(html_path, 'w') #'a'
+		self.debug_log = open('debug.log', 'a')
 		self.password = password
 		self.device = None
 		self.indent = '  '
@@ -57,6 +59,7 @@ class PDF2HTML(object):
 		# print "deleted"
 		self.reader.close()
 		self.writer.close()
+		self.debug_log.close()
 		if self.device:
 			self.device.close()
 		sys._clear_type_cache() 
@@ -64,6 +67,9 @@ class PDF2HTML(object):
 
 	def write(self, content):
 		self.writer.write(self.level * self.indent + str(content).encode('utf-8') + '\n')
+
+	def debug_write(self, content):
+		self.debug_log.write(str(content).encode('utf-8') + '\n')
 
 	def chinese_str(self, content, codec = 'utf-8'):
 		return u'{0}'.format(content).encode('gbk')
@@ -173,6 +179,8 @@ class simplePDF2HTML(PDF2HTML):
 			major_indents, map_indents, major_size = self.get_conclude(indent_list, fontsize_list)
 			typical_length = content_width / major_size
 			# raw_input()
+			# print table_info
+			self.show_page_layout(layout)
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					fontname, fontsize, location, line_width = self.get_font(x)
@@ -217,6 +225,7 @@ class simplePDF2HTML(PDF2HTML):
 						self.write('<p style="font-size:{2}px;font-weight:{3}text-indent:0.0em;" align="{1}">{0}</p>'.format( \
 								text, align, fontsize, fontweight
 							))
+				'''
 				else:
 					if isinstance(x, LTRect):
 						print "page {0}".format(page_idx)
@@ -227,6 +236,7 @@ class simplePDF2HTML(PDF2HTML):
 						print x
 						print x.x0, x.x1, x.y0, x.y1
 					raw_input()
+				'''
 			page_idx += 1
 		
 		if prev_text:
@@ -347,38 +357,67 @@ class simplePDF2HTML(PDF2HTML):
 		else:
 			return True
 
-	'''
-	def if_para_end(self, max_width, line_width, last_char, \
-			prev_size, prev_weight, prev_align, fontsize, fontweight, align, \
-			debug = None):
-
-		threshold = 0.9
-
-		# 如果是居中或者居右，直接换行
-		if prev_align == "center" or prev_align == "right":
-			print "location"
+	def is_line(self, rect_elem):
+		threshold = 2
+		if (rect_elem.x1 - rect_elem.x0) < threshold:
 			return True
-		# 以下居左
-		# 如果居左且比较短，直接换行
-		if line_width < threshold * max_width:
-			print "shorter than usual"
-			return True
-		# 如果对齐方式不一样，可以直接换行
-		if prev_align != align:
-			print "alignment difference"
-			return True
-
-		# 对齐方式一样，足够长，居左，但是结尾并不是完结符，不换行
-		if last_char not in self.endmark_list:
-			print "no end mark"
-			return False
-		
-		# 结尾是完结符，对齐方式一样，够长，居左，如果字体大小和粗细不一样可以换行
-		if prev_size != fontsize:
-			print "size difference"
-			return True
-		if prev_weight != fontweight:
-			print "weight difference"
+		if (rect_elem.y1 - rect_elem.y0) < threshold:
 			return True
 		return False
-	'''
+
+	def show_page_layout(self, layout):
+		page_range = {
+			"left": layout.x0,
+			"right": layout.x1,
+			"top": layout.y1,
+			"bottom": layout.y0
+		}
+		print "Page Range = left:{0}, right: {1}, top: {2}, bottom: {3}".format(\
+			page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
+		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
+		size_x = 1.5 * (page_range["right"] - page_range["left"])
+		size_y = 1.5 * (page_range["bottom"] - page_range["top"])
+		drawer = Draw(size_x, size_y, offset_x, offset_y)
+		drawer.set_color("black")
+		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		for x in layout:
+			if(isinstance(x, LTTextBoxHorizontal)):
+				for c in x:
+					print c
+					#drawer.set_color("brown")
+					#drawer.square(c.x0, c.x1, c.y1, c.y0)
+				drawer.set_color("black")
+			elif(isinstance(x, LTRect)):
+				if(self.is_line(x)):
+					drawer.set_color("orange")
+				else:
+					drawer.set_color("red")
+			else:
+				drawer.set_color("blue")
+			left = x.x0
+			right = x.x1
+			top = x.y1
+			bottom = x.y0
+			print "left:{0}, right: {1}, top: {2}, bottom: {3}".format(left, right, top, bottom)
+			drawer.square(left, right, top, bottom)
+		raw_input()
+		return layout
+
+class Draw(object):
+	def __init__(self, size_x, size_y, offset_x, offset_y):
+		self.offset_x = offset_x
+		self.offset_y = offset_y
+		turtle.clear()
+		turtle.screensize(canvwidth=size_x, canvheight=size_y, bg=None)
+	def set_color(self, color_string):
+		turtle.pencolor(color_string)
+	def square(self, left, right, top, bottom):
+		turtle.penup()
+		turtle.goto(left + self.offset_x, top + self.offset_y)
+		turtle.pendown()
+		turtle.goto(right + self.offset_x, top + self.offset_y)
+		turtle.goto(right + self.offset_x, bottom + self.offset_y)
+		turtle.goto(left + self.offset_x, bottom + self.offset_y)
+		turtle.goto(left + self.offset_x, top + self.offset_y)
+		turtle.penup()

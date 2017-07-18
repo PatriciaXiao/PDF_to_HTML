@@ -26,3 +26,10 @@ http://blog.csdn.net/sqlserverdiscovery/article/details/51425543
 http://denis.papathanasiou.org/posts/2010.08.04.post.html
 
 http://blog.csdn.net/zouxy09/article/details/8781396
+
+matplotlib
+https://stackoverflow.com/questions/18280436/importerror-matplotlib-requires-dateutil
+http://www.open-open.com/lib/view/open1393488232380.html
+https://sourceforge.net/projects/matplotlib/files/
+https://packaging.python.org/tutorials/installing-packages/
+http://www.itkeyword.com/doc/9484478318592984x494/importerror-dll-load-failed-importing-tkinter
