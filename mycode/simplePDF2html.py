@@ -180,7 +180,8 @@ class simplePDF2HTML(PDF2HTML):
 			typical_length = content_width / major_size
 			# raw_input()
 			# print table_info
-			self.show_page_layout(layout)
+			# self.show_page_layout(layout)
+			self.get_tables(layout)
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					fontname, fontsize, location, line_width = self.get_font(x)
@@ -225,18 +226,6 @@ class simplePDF2HTML(PDF2HTML):
 						self.write('<p style="font-size:{2}px;font-weight:{3}text-indent:0.0em;" align="{1}">{0}</p>'.format( \
 								text, align, fontsize, fontweight
 							))
-				'''
-				else:
-					if isinstance(x, LTRect):
-						print "page {0}".format(page_idx)
-						print x
-						print x.x0, x.x1, x.y0, x.y1
-					else:
-						print "page {0}".format(page_idx)
-						print x
-						print x.x0, x.x1, x.y0, x.y1
-					raw_input()
-				'''
 			page_idx += 1
 		
 		if prev_text:
@@ -360,9 +349,9 @@ class simplePDF2HTML(PDF2HTML):
 	def is_line(self, rect_elem):
 		threshold = 2
 		if (rect_elem.x1 - rect_elem.x0) < threshold:
-			return True
+			return "y"
 		if (rect_elem.y1 - rect_elem.y0) < threshold:
-			return True
+			return "x"
 		return False
 
 	def show_page_layout(self, layout):
@@ -382,6 +371,7 @@ class simplePDF2HTML(PDF2HTML):
 		drawer.set_color("black")
 		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		for x in layout:
+			isLine = False
 			if(isinstance(x, LTTextBoxHorizontal)):
 				for line in x:
 					# print line # LTTextLine
@@ -397,7 +387,8 @@ class simplePDF2HTML(PDF2HTML):
 					#drawer.square(c.x0, c.x1, c.y1, c.y0)
 				drawer.set_color("black")
 			elif(isinstance(x, LTRect)):
-				if(self.is_line(x)):
+				isLine = self.is_line(x)
+				if isLine:
 					drawer.set_color("orange")
 				else:
 					drawer.set_color("red")
@@ -408,18 +399,96 @@ class simplePDF2HTML(PDF2HTML):
 			top = x.y1
 			bottom = x.y0
 			print "left:{0}, right: {1}, top: {2}, bottom: {3}".format(left, right, top, bottom)
-			drawer.square(left, right, top, bottom)
+			if isLine == 'x':
+				fixed_y = (top + bottom) / 2.0
+				drawer.line(left, fixed_y, right, fixed_y)
+			elif isLine =='y':
+				fixed_x = (left + right) / 2.0
+				drawer.line(fixed_x, top, fixed_x, bottom)
+			else:
+				drawer.square(left, right, top, bottom)
+		# raw_input()
+		return layout
+
+	def get_tables(self, layout):
+		page_range = {
+			"left": layout.x0,
+			"right": layout.x1,
+			"top": layout.y1,
+			"bottom": layout.y0
+		}
+		print "Page Range = left:{0}, right: {1}, top: {2}, bottom: {3}".format(\
+			page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
+		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
+		size_x = 1.5 * (page_range["right"] - page_range["left"])
+		size_y = 1.5 * (page_range["top"] - page_range["bottom"])
+		drawer = Draw(size_x, size_y, offset_x, offset_y)
+		drawer.set_color("black")
+		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		for x in layout:
+			isLine = False
+			if(isinstance(x, LTTextBoxHorizontal)):
+				for line in x:
+					# print line # LTTextLine
+					for char in line:
+						# print char # LTChar / LTAnno
+						if isinstance(char, LTChar):
+							drawer.set_color("brown")
+							drawer.square(char.x0, char.x1, char.y1, char.y0)
+						elif isinstance(char, LTChar):
+							drawer.set_color("gray")
+							drawer.square(char.x0, char.x1, char.y1, char.y0)
+					#drawer.set_color("brown")
+					#drawer.square(c.x0, c.x1, c.y1, c.y0)
+				drawer.set_color("black")
+			elif(isinstance(x, LTRect)):
+				isLine = self.is_line(x)
+				if isLine:
+					drawer.set_color("orange")
+				else:
+					drawer.set_color("red")
+			else:
+				drawer.set_color("blue")
+			left = x.x0
+			right = x.x1
+			top = x.y1
+			bottom = x.y0
+			print "left:{0}, right: {1}, top: {2}, bottom: {3}".format(left, right, top, bottom)
+			if isLine == 'x':
+				fixed_y = (top + bottom) / 2.0
+				drawer.line(left, fixed_y, right, fixed_y)
+			elif isLine =='y':
+				fixed_x = (left + right) / 2.0
+				drawer.line(fixed_x, top, fixed_x, bottom)
+			else:
+				drawer.square(left, right, top, bottom)
 		raw_input()
 		return layout
+
+class Table(object):
+	def __init__(self, row, col):
+		self.data = []
+		for i in range(row):
+			line = []
+			for j in range(col):
+				line.append([])
+			data.append(line)
 
 class Draw(object):
 	def __init__(self, size_x, size_y, offset_x, offset_y):
 		self.offset_x = offset_x
 		self.offset_y = offset_y
 		turtle.clear()
-		turtle.screensize(canvwidth=size_x, canvheight=size_y, bg=None)
+		turtle.screensize(canvwidth=size_x, canvheight=size_y, bg=None)	
 	def set_color(self, color_string):
 		turtle.pencolor(color_string)
+	def line(self, start_x, start_y, end_x, end_y):
+		turtle.penup()
+		turtle.goto(start_x + self.offset_x, start_y + self.offset_y)
+		turtle.pendown()
+		turtle.goto(end_x + self.offset_x, end_y + self.offset_y)
+		turtle.penup()
 	def square(self, left, right, top, bottom):
 		turtle.penup()
 		turtle.goto(left + self.offset_x, top + self.offset_y)

@@ -18,7 +18,7 @@ def get_PDF_fnames(directory):
 # get_PDF_fnames('data/')
 
 # fname_list = ['data/table_example_1.pdf', 'data/table_example_2.pdf', 'data/table_example_3.pdf']
-fname_list = ['data/table_example_1.pdf']
+fname_list = ['data/table_example_2.pdf']
 # fname_list = ['data/simple1.PDF', 'data/simple2.PDF', 'data/simple3.PDF']
 # fname_list = ['data/simple2.PDF']
 # fname_list = ['data/2016-03-26-1202083818.PDF']
