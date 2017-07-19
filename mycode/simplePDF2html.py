@@ -367,9 +367,9 @@ class simplePDF2HTML(PDF2HTML):
 		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
 		size_x = 1.5 * (page_range["right"] - page_range["left"])
 		size_y = 1.5 * (page_range["top"] - page_range["bottom"])
-		drawer = Draw(size_x, size_y, offset_x, offset_y)
-		drawer.set_color("black")
-		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		draw = Draw(size_x, size_y, offset_x, offset_y)
+		draw.set_color("black")
+		draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		for x in layout:
 			isLine = False
 			if(isinstance(x, LTTextBoxHorizontal)):
@@ -378,20 +378,20 @@ class simplePDF2HTML(PDF2HTML):
 					for char in line:
 						# print char # LTChar / LTAnno
 						if isinstance(char, LTChar):
-							drawer.set_color("brown")
-							drawer.square(char.x0, char.x1, char.y1, char.y0)
+							draw.set_color("brown")
+							draw.square(char.x0, char.x1, char.y1, char.y0)
 						elif isinstance(char, LTChar):
-							drawer.set_color("gray")
-							drawer.square(char.x0, char.x1, char.y1, char.y0)
-				drawer.set_color("black")
+							draw.set_color("gray")
+							draw.square(char.x0, char.x1, char.y1, char.y0)
+				draw.set_color("black")
 			elif(isinstance(x, LTRect)):
 				isLine = self.is_line(x)
 				if isLine:
-					drawer.set_color("orange")
+					draw.set_color("orange")
 				else:
-					drawer.set_color("red")
+					draw.set_color("red")
 			else:
-				drawer.set_color("blue")
+				draw.set_color("blue")
 			left = x.x0
 			right = x.x1
 			top = x.y1
@@ -399,14 +399,31 @@ class simplePDF2HTML(PDF2HTML):
 			print "left:{0}, right: {1}, top: {2}, bottom: {3}".format(left, right, top, bottom)
 			if isLine == 'x':
 				fixed_y = (top + bottom) / 2.0
-				drawer.line(left, fixed_y, right, fixed_y)
+				draw.line(left, fixed_y, right, fixed_y)
 			elif isLine =='y':
 				fixed_x = (left + right) / 2.0
-				drawer.line(fixed_x, top, fixed_x, bottom)
+				draw.line(fixed_x, top, fixed_x, bottom)
 			else:
-				drawer.square(left, right, top, bottom)
+				draw.square(left, right, top, bottom)
 		raw_input()
 		return layout
+
+	
+	def get_pts_max_dist(self, pt1, pt2):
+		assert len(pt1) == 2, "point 1 position {0}'s length is not 2".format(pt1)
+		assert len(pt2) == 2, "point 2 position {0}'s length is not 2".format(pt2)
+		return max(abs(pt1[0] - pt2[0]), abs(pt1[1] - pt2[1]))
+
+	def get_closest_idx(self, goal_value, lst, threshold = 0):
+		closest_idx = -1
+		for i in range(len(lst)):
+			item = lst[i]
+			if abs(item - goal_value) <= threshold:
+				closest_idx = i
+				break
+		# print closest_idx
+		return closest_idx
+	
 
 	def get_tables(self, layout):
 		page_range = {
@@ -415,65 +432,120 @@ class simplePDF2HTML(PDF2HTML):
 			"top": layout.y1,
 			"bottom": layout.y0
 		}
-		print "Page Range = left:{0}, right: {1}, top: {2}, bottom: {3}".format(\
-			page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
 		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
 		size_x = 1.5 * (page_range["right"] - page_range["left"])
 		size_y = 1.5 * (page_range["top"] - page_range["bottom"])
-		drawer = Draw(size_x, size_y, offset_x, offset_y)
-		drawer.set_color("black")
-		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		draw = Draw(size_x, size_y, offset_x, offset_y)
+		draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		# get the maximum value of the line stroke width
 		max_stroke = -1
+		raw_lines = [] # contents: ((x1, y1), (x2, y2))
+		raw_points = {} # contents: (x, y): [idx1, idx2, ...] - the index of corresponding lines
+		raw_points_x = [] # contents: x
+		raw_points_y = [] # contents: y
+		lines_visited = [] # contents: True / False
+		# get the max stroke width
 		for x in layout:
 			if(isinstance(x, LTRect)):
-				isLine = self.is_line(x)
-				if isLine:
-					left = x.x0
-					right = x.x1
-					top = x.y1
-					bottom = x.y0
-					left = int(left)
-					right = int(right)
-					top = int(top)
-					bottom = int(bottom)
-					if isLine == 'x':
-						line_stroke = top - bottom
-						if line_stroke > max_stroke:
-							max_stroke = line_stroke
-					elif isLine =='y':
-						line_stroke = right - left
-						if line_stroke > max_stroke:
-							max_stroke = line_stroke
-		if max_stroke >= 0:
-			bias = 3 * max_stroke
-		else:
-			bias = 4
-		print max_stroke
-		# fill in the contents
-		table_layout = [] # list of tables; table: {"rows":[], "cols": []}
-		for x in layout:
-			if(isinstance(x, LTRect)):
-				isLine = self.is_line(x)
-				# converting them to integers has little side-effect
-				# besides, it'll make it much easier to build a dictionary
 				left = x.x0
 				right = x.x1
 				top = x.y1
 				bottom = x.y0
-				left = int(left)
-				right = int(right)
-				top = int(top)
-				bottom = int(bottom)
-				if isLine == 'x':
-					fixed_y = int((top + bottom) / 2.0)
-					drawer.line(left, fixed_y, right, fixed_y)
-				elif isLine =='y':
-					fixed_x = int((left + right) / 2.0)
-					drawer.line(fixed_x, top, fixed_x, bottom)
-				else:
-					drawer.square(left, right, top, bottom)
+				isLine = self.is_line(x)
+				if isLine: # a line
+					# fetch data
+					if isLine == 'x':
+						line_stroke = top - bottom
+					elif isLine =='y':
+						line_stroke = right - left
+					# update data
+					if line_stroke > max_stroke:
+						max_stroke = line_stroke
+		if max_stroke >= 0:
+			bias = 3 * max_stroke
+		else:
+			bias = 4
+		# the raw lines
+		for x in layout:
+			if(isinstance(x, LTRect)):
+				left = x.x0
+				right = x.x1
+				top = x.y1
+				bottom = x.y0
+				idx_left = self.get_closest_idx(left, raw_points_x, bias)
+				idx_right = self.get_closest_idx(right, raw_points_x, bias)
+				idx_top = self.get_closest_idx(top, raw_points_y, bias)
+				idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
+				if idx_left >= 0:
+					left = raw_points_x[idx_left]
+				if idx_right >= 0:
+					right = raw_points_x[idx_right]
+				if idx_top >= 0:
+					top = raw_points_y[idx_top]
+				if idx_bottom >= 0:
+					bottom = raw_points_y[idx_bottom]
+				
+				isLine = self.is_line(x)
+				if isLine: # a line
+					# fetch data
+					if isLine == 'x':
+						fixed_y = (top + bottom) / 2.0
+						idx_fixed_y = self.get_closest_idx(fixed_y, raw_points_y, bias)
+						if idx_fixed_y >= 0:
+							fixed_y = raw_points_y[idx_fixed_y]
+						else:
+							raw_points_y.append(fixed_y)
+						if idx_left == -1:
+							raw_points_x.append(left)
+						if idx_right == -1:
+							raw_points_x.append(right)
+						pt1 = (left, fixed_y)
+						pt2 = (right, fixed_y)
+					elif isLine =='y':
+						fixed_x = (left + right) / 2.0
+						idx_fixed_x = self.get_closest_idx(fixed_x, raw_points_x, bias)
+						if idx_fixed_x >= 0:
+							fixed_x = raw_points_x[idx_fixed_x]
+						else:
+							raw_points_x.append(fixed_x)
+						if idx_top == -1:
+							raw_points_x.append(top)
+						if idx_bottom == -1:
+							raw_points_x.append(bottom)
+						pt1 = (fixed_x, top)
+						pt2 = (fixed_x, bottom)
+					# update data
+					tmp_idx_line = len(raw_lines)
+					if (pt1, pt2) not in raw_lines:
+						raw_lines.append( (pt1, pt2) )
+						lines_visited.append( False )
+						if pt1 not in raw_points:
+							raw_points[pt1] = [tmp_idx_line]
+						else:
+							raw_points[pt1].append(tmp_idx_line)
+						if pt2 not in raw_points:
+							raw_points[pt2] = [tmp_idx_line]
+						else:
+							raw_points[pt2].append(tmp_idx_line)
+				else: # a rectangle
+					pt1 = (left, top)
+					pt2 = (right, top)
+					pt3 = (right, bottom)
+					pt4 = (left, bottom)
+					raw_lines.append( (pt1, pt2) )
+					lines_visited.append( False )
+					raw_lines.append( (pt2, pt3) )
+					lines_visited.append( False )
+					raw_lines.append( (pt3, pt4) )
+					lines_visited.append( False )
+					raw_lines.append( (pt4, pt1) )
+					lines_visited.append( False )
+		# print raw_lines
+		print raw_points
+		# test
+		for line in raw_lines:
+			draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
 		raw_input()
 		return layout
 
@@ -485,10 +557,17 @@ class Draw(object):
 		turtle.screensize(canvwidth=size_x, canvheight=size_y, bg=None)	
 	def set_color(self, color_string):
 		turtle.pencolor(color_string)
+	def dot(self, x, y, size=3, color_string="purple"):
+		# turtle.penup()
+		turtle.goto(x + self.offset_x, y + self.offset_y)
+		# turtle.pendown()
+		turtle.dot(size, color_string)
+		# turtle.penup()
 	def line(self, start_x, start_y, end_x, end_y):
 		turtle.penup()
 		turtle.goto(start_x + self.offset_x, start_y + self.offset_y)
 		turtle.pendown()
+		self.dot(start_x, start_y)
 		turtle.goto(end_x + self.offset_x, end_y + self.offset_y)
 		turtle.penup()
 	def square(self, left, right, top, bottom):
