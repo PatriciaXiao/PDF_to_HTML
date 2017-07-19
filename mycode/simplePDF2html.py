@@ -366,62 +366,6 @@ class simplePDF2HTML(PDF2HTML):
 		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
 		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
 		size_x = 1.5 * (page_range["right"] - page_range["left"])
-		size_y = 1.5 * (page_range["bottom"] - page_range["top"])
-		drawer = Draw(size_x, size_y, offset_x, offset_y)
-		drawer.set_color("black")
-		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
-		for x in layout:
-			isLine = False
-			if(isinstance(x, LTTextBoxHorizontal)):
-				for line in x:
-					# print line # LTTextLine
-					for char in line:
-						# print char # LTChar / LTAnno
-						if isinstance(char, LTChar):
-							drawer.set_color("brown")
-							drawer.square(char.x0, char.x1, char.y1, char.y0)
-						elif isinstance(char, LTChar):
-							drawer.set_color("gray")
-							drawer.square(char.x0, char.x1, char.y1, char.y0)
-					#drawer.set_color("brown")
-					#drawer.square(c.x0, c.x1, c.y1, c.y0)
-				drawer.set_color("black")
-			elif(isinstance(x, LTRect)):
-				isLine = self.is_line(x)
-				if isLine:
-					drawer.set_color("orange")
-				else:
-					drawer.set_color("red")
-			else:
-				drawer.set_color("blue")
-			left = x.x0
-			right = x.x1
-			top = x.y1
-			bottom = x.y0
-			print "left:{0}, right: {1}, top: {2}, bottom: {3}".format(left, right, top, bottom)
-			if isLine == 'x':
-				fixed_y = (top + bottom) / 2.0
-				drawer.line(left, fixed_y, right, fixed_y)
-			elif isLine =='y':
-				fixed_x = (left + right) / 2.0
-				drawer.line(fixed_x, top, fixed_x, bottom)
-			else:
-				drawer.square(left, right, top, bottom)
-		# raw_input()
-		return layout
-
-	def get_tables(self, layout):
-		page_range = {
-			"left": layout.x0,
-			"right": layout.x1,
-			"top": layout.y1,
-			"bottom": layout.y0
-		}
-		print "Page Range = left:{0}, right: {1}, top: {2}, bottom: {3}".format(\
-			page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
-		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
-		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
-		size_x = 1.5 * (page_range["right"] - page_range["left"])
 		size_y = 1.5 * (page_range["top"] - page_range["bottom"])
 		drawer = Draw(size_x, size_y, offset_x, offset_y)
 		drawer.set_color("black")
@@ -439,8 +383,6 @@ class simplePDF2HTML(PDF2HTML):
 						elif isinstance(char, LTChar):
 							drawer.set_color("gray")
 							drawer.square(char.x0, char.x1, char.y1, char.y0)
-					#drawer.set_color("brown")
-					#drawer.square(c.x0, c.x1, c.y1, c.y0)
 				drawer.set_color("black")
 			elif(isinstance(x, LTRect)):
 				isLine = self.is_line(x)
@@ -466,14 +408,74 @@ class simplePDF2HTML(PDF2HTML):
 		raw_input()
 		return layout
 
-class Table(object):
-	def __init__(self, row, col):
-		self.data = []
-		for i in range(row):
-			line = []
-			for j in range(col):
-				line.append([])
-			data.append(line)
+	def get_tables(self, layout):
+		page_range = {
+			"left": layout.x0,
+			"right": layout.x1,
+			"top": layout.y1,
+			"bottom": layout.y0
+		}
+		print "Page Range = left:{0}, right: {1}, top: {2}, bottom: {3}".format(\
+			page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
+		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
+		size_x = 1.5 * (page_range["right"] - page_range["left"])
+		size_y = 1.5 * (page_range["top"] - page_range["bottom"])
+		drawer = Draw(size_x, size_y, offset_x, offset_y)
+		drawer.set_color("black")
+		drawer.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		# get the maximum value of the line stroke width
+		max_stroke = -1
+		for x in layout:
+			if(isinstance(x, LTRect)):
+				isLine = self.is_line(x)
+				if isLine:
+					left = x.x0
+					right = x.x1
+					top = x.y1
+					bottom = x.y0
+					left = int(left)
+					right = int(right)
+					top = int(top)
+					bottom = int(bottom)
+					if isLine == 'x':
+						line_stroke = top - bottom
+						if line_stroke > max_stroke:
+							max_stroke = line_stroke
+					elif isLine =='y':
+						line_stroke = right - left
+						if line_stroke > max_stroke:
+							max_stroke = line_stroke
+		if max_stroke >= 0:
+			bias = 3 * max_stroke
+		else:
+			bias = 4
+		print max_stroke
+		# fill in the contents
+		table_layout = [] # list of tables; table: {"rows":[], "cols": []}
+		for x in layout:
+			if(isinstance(x, LTRect)):
+				isLine = self.is_line(x)
+				# converting them to integers has little side-effect
+				# besides, it'll make it much easier to build a dictionary
+				left = x.x0
+				right = x.x1
+				top = x.y1
+				bottom = x.y0
+				left = int(left)
+				right = int(right)
+				top = int(top)
+				bottom = int(bottom)
+				if isLine == 'x':
+					fixed_y = int((top + bottom) / 2.0)
+					drawer.line(left, fixed_y, right, fixed_y)
+				elif isLine =='y':
+					fixed_x = int((left + right) / 2.0)
+					drawer.line(fixed_x, top, fixed_x, bottom)
+				else:
+					drawer.square(left, right, top, bottom)
+		raw_input()
+		return layout
 
 class Draw(object):
 	def __init__(self, size_x, size_y, offset_x, offset_y):
