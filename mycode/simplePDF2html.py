@@ -524,9 +524,9 @@ class simplePDF2HTML(PDF2HTML):
 					elif isLine =='y':
 						# print 'y'
 						if idx_top == -1:
-							raw_points_x.append(top)
+							raw_points_y.append(top)
 						if idx_bottom == -1:
-							raw_points_x.append(bottom)
+							raw_points_y.append(bottom)
 						fixed_x = (left + right) / 2.0
 						fixed_y = int(fixed_x)
 						idx_fixed_x = self.get_closest_idx(fixed_x, raw_points_x, bias)
@@ -540,17 +540,17 @@ class simplePDF2HTML(PDF2HTML):
 					# update data
 					if pt1 not in raw_points.keys():
 						#####
-						print pt1
-						draw.dot(pt1[0], pt1[1], size=15, color_string="green")
-						raw_input()
+						# print pt1
+						# draw.dot(pt1[0], pt1[1], size=15, color_string="green")
+						# raw_input()
 						#######
 						raw_points[pt1] = []
 						points_visited[pt1] = False
 					if pt2 not in raw_points.keys():
 						######
-						print pt2
-						draw.dot(pt2[0], pt2[1], size=15, color_string="green")
-						raw_input()
+						# print pt2
+						# draw.dot(pt2[0], pt2[1], size=15, color_string="green")
+						# raw_input()
 						########
 						raw_points[pt2] = []
 						points_visited[pt2] = False
