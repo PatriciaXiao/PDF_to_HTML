@@ -348,9 +348,9 @@ class simplePDF2HTML(PDF2HTML):
 
 	def is_line(self, rect_elem):
 		threshold = 2
-		if (rect_elem.x1 - rect_elem.x0) < threshold:
+		if (rect_elem.x1 - rect_elem.x0) < threshold and (rect_elem.y1 - rect_elem.y0) > 3 * threshold:
 			return "y"
-		if (rect_elem.y1 - rect_elem.y0) < threshold:
+		if (rect_elem.y1 - rect_elem.y0) < threshold and (rect_elem.x1 - rect_elem.x0) > 3 * threshold:
 			return "x"
 		return False
 
@@ -414,10 +414,14 @@ class simplePDF2HTML(PDF2HTML):
 		assert len(pt2) == 2, "point 2 position {0}'s length is not 2".format(pt2)
 		return max(abs(pt1[0] - pt2[0]), abs(pt1[1] - pt2[1]))
 
-	def get_closest_idx(self, goal_value, lst, threshold = 0):
+	def get_closest_idx(self, goal_value, lst, threshold):
 		closest_idx = -1
 		for i in range(len(lst)):
 			item = lst[i]
+			#######
+			if goal_value == 581:
+				print "compare {0} with {1}".format(goal_value, lst[i])
+			#######
 			if abs(item - goal_value) <= threshold:
 				closest_idx = i
 				break
@@ -444,7 +448,7 @@ class simplePDF2HTML(PDF2HTML):
 		raw_points = {} # contents: (x, y): [idx1, idx2, ...] - the index of corresponding lines
 		raw_points_x = [] # contents: x
 		raw_points_y = [] # contents: y
-		lines_visited = [] # contents: True / False
+		points_visited = {} # contents: (x, y) : True / False
 		# get the max stroke width
 		for x in layout:
 			if(isinstance(x, LTRect)):
@@ -452,6 +456,10 @@ class simplePDF2HTML(PDF2HTML):
 				right = x.x1
 				top = x.y1
 				bottom = x.y0
+				left = int(left)
+				right = int(right)
+				top = int(top)
+				bottom = int(bottom)
 				isLine = self.is_line(x)
 				if isLine: # a line
 					# fetch data
@@ -465,7 +473,7 @@ class simplePDF2HTML(PDF2HTML):
 		if max_stroke >= 0:
 			bias = 3 * max_stroke
 		else:
-			bias = 4
+			bias = 5
 		# the raw lines
 		for x in layout:
 			if(isinstance(x, LTRect)):
@@ -473,6 +481,10 @@ class simplePDF2HTML(PDF2HTML):
 				right = x.x1
 				top = x.y1
 				bottom = x.y0
+				left = int(left)
+				right = int(right)
+				top = int(top)
+				bottom = int(bottom)
 				idx_left = self.get_closest_idx(left, raw_points_x, bias)
 				idx_right = self.get_closest_idx(right, raw_points_x, bias)
 				idx_top = self.get_closest_idx(top, raw_points_y, bias)
@@ -485,64 +497,174 @@ class simplePDF2HTML(PDF2HTML):
 					top = raw_points_y[idx_top]
 				if idx_bottom >= 0:
 					bottom = raw_points_y[idx_bottom]
-				
+
+				###########
+				# if left
+				###########
+
 				isLine = self.is_line(x)
 				if isLine: # a line
 					# fetch data
 					if isLine == 'x':
+						# print 'x'
+						if idx_left == -1:
+							raw_points_x.append(left)
+						if idx_right == -1:
+							raw_points_x.append(right)
 						fixed_y = (top + bottom) / 2.0
+						fixed_y = int(fixed_y)
 						idx_fixed_y = self.get_closest_idx(fixed_y, raw_points_y, bias)
 						if idx_fixed_y >= 0:
 							fixed_y = raw_points_y[idx_fixed_y]
 						else:
 							raw_points_y.append(fixed_y)
-						if idx_left == -1:
-							raw_points_x.append(left)
-						if idx_right == -1:
-							raw_points_x.append(right)
+						
 						pt1 = (left, fixed_y)
 						pt2 = (right, fixed_y)
 					elif isLine =='y':
+						# print 'y'
+						if idx_top == -1:
+							raw_points_x.append(top)
+						if idx_bottom == -1:
+							raw_points_x.append(bottom)
 						fixed_x = (left + right) / 2.0
+						fixed_y = int(fixed_x)
 						idx_fixed_x = self.get_closest_idx(fixed_x, raw_points_x, bias)
 						if idx_fixed_x >= 0:
 							fixed_x = raw_points_x[idx_fixed_x]
 						else:
 							raw_points_x.append(fixed_x)
-						if idx_top == -1:
-							raw_points_x.append(top)
-						if idx_bottom == -1:
-							raw_points_x.append(bottom)
+						
 						pt1 = (fixed_x, top)
 						pt2 = (fixed_x, bottom)
 					# update data
+					if pt1 not in raw_points.keys():
+						#####
+						print pt1
+						draw.dot(pt1[0], pt1[1], size=15, color_string="green")
+						raw_input()
+						#######
+						raw_points[pt1] = []
+						points_visited[pt1] = False
+					if pt2 not in raw_points.keys():
+						######
+						print pt2
+						draw.dot(pt2[0], pt2[1], size=15, color_string="green")
+						raw_input()
+						########
+						raw_points[pt2] = []
+						points_visited[pt2] = False
 					tmp_idx_line = len(raw_lines)
-					if (pt1, pt2) not in raw_lines:
+					if (pt1, pt2) not in raw_lines and (pt2, pt1) not in raw_lines:
 						raw_lines.append( (pt1, pt2) )
-						lines_visited.append( False )
-						if pt1 not in raw_points:
-							raw_points[pt1] = [tmp_idx_line]
-						else:
-							raw_points[pt1].append(tmp_idx_line)
-						if pt2 not in raw_points:
-							raw_points[pt2] = [tmp_idx_line]
-						else:
-							raw_points[pt2].append(tmp_idx_line)
+						raw_points[pt1].append(tmp_idx_line)
+						raw_points[pt2].append(tmp_idx_line)
 				else: # a rectangle
 					pt1 = (left, top)
 					pt2 = (right, top)
 					pt3 = (right, bottom)
 					pt4 = (left, bottom)
-					raw_lines.append( (pt1, pt2) )
-					lines_visited.append( False )
-					raw_lines.append( (pt2, pt3) )
-					lines_visited.append( False )
-					raw_lines.append( (pt3, pt4) )
-					lines_visited.append( False )
-					raw_lines.append( (pt4, pt1) )
-					lines_visited.append( False )
+					points_visited[pt1] = False
+					points_visited[pt2] = False
+					points_visited[pt3] = False
+					points_visited[pt4] = False
+					if pt1 not in raw_points:
+						raw_points[pt1] = []
+					if pt2 not in raw_points:
+						raw_points[pt2] = []
+					if pt3 not in raw_points:
+						raw_points[pt3] = []
+					if pt4 not in raw_points:
+						raw_points[pt4] = []
+					# raw_lines.append( (pt1, pt2) )
+					tmp_idx_line = len(raw_lines)
+					if (pt1, pt2) not in raw_lines and (pt2, pt1) not in raw_lines:
+						raw_lines.append( (pt1, pt2) )
+						raw_points[pt1].append(tmp_idx_line)
+						raw_points[pt2].append(tmp_idx_line)
+					# raw_lines.append( (pt2, pt3) )
+					tmp_idx_line = len(raw_lines)
+					if (pt2, pt3) not in raw_lines and (pt3, pt2) not in raw_lines:
+						raw_lines.append( (pt2, pt3) )
+						raw_points[pt2].append(tmp_idx_line)
+						raw_points[pt3].append(tmp_idx_line)
+					# raw_lines.append( (pt3, pt4) )
+					tmp_idx_line = len(raw_lines)
+					if (pt3, pt4) not in raw_lines and (pt4, pt3) not in raw_lines:
+						raw_lines.append( (pt3, pt4) )
+						raw_points[pt3].append(tmp_idx_line)
+						raw_points[pt4].append(tmp_idx_line)
+					# raw_lines.append( (pt4, pt1) )
+					tmp_idx_line = len(raw_lines)
+					if (pt4, pt1) not in raw_lines and (pt1, pt4) not in raw_lines:
+						raw_lines.append( (pt4, pt1) )
+						raw_points[pt4].append(tmp_idx_line)
+						raw_points[pt1].append(tmp_idx_line)
 		# print raw_lines
-		print raw_points
+		# print raw_points
+		# calculate the points included in a table, and the grids
+		assert len(points_visited.keys()) == len(raw_points.keys()), "points amount and points list length do not match"
+
+
+		point_list = raw_points.copy()
+
+		def debug_walk(tmp_point):
+			if points_visited[tmp_point]:
+				return
+			points_visited[tmp_point] = True
+			draw.dot(tmp_point[0], tmp_point[1], size=15, color_string="green")
+			next_links = point_list[tmp_point]
+			for idx in next_links:
+				line = raw_lines[idx]
+				debug_walk(line[0])
+				debug_walk(line[1])
+		test_point = point_list.keys()[0]
+		test_value = point_list[test_point]
+		# debug_walk(test_point)
+
+		'''
+		def recursively_get_group(tmp_point):
+			next_list = [] # content: (x, y)
+			ret_val = []
+			# if the point has already been visited
+			if points_visited[tmp_point]:
+				return []
+			else:
+				points_visited[tmp_point] = True
+				ret_val.append(tmp_point)
+			# get the neighbours
+			next_idx_lst = point_list.pop(tmp_point)
+			for idx in next_idx_lst:
+				line = raw_lines[idx]
+				# draw.dot(line[0][0], line[0][1], size=15, color_string="green")
+				# draw.dot(line[1][0], line[1][1], size=15, color_string="green")
+				
+				next_point = line[0]
+				if next_point == tmp_point:
+					next_point = line[1]
+				if points_visited[next_point]: 
+					continue
+				next_list.append(next_point)
+				# draw.dot(next_point[0], next_point[1], size=15, color_string="green")
+				
+			# returning
+			if len(next_list) > 0: # no temporary next candidates left
+				ret_val = recursively_get_group(next_list[0])
+				for i in range(1, len(next_list)):
+					ret_val.extend(recursively_get_group(next_list[i]))
+			return ret_val
+
+		print len(point_list)
+		test_point = point_list.keys()[0]
+		test_value = point_list[test_point]
+		print test_point, test_value
+		test_set = recursively_get_group(test_point)
+		print test_set
+		print len(point_list)
+		for pt in test_set:
+			draw.dot(pt[0], pt[1], size=10, color_string="red")
+		'''
+
 		# test
 		for line in raw_lines:
 			draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
