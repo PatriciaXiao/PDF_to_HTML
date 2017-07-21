@@ -182,12 +182,55 @@ class simplePDF2HTML(PDF2HTML):
 			# self.show_page_layout(layout)
 			table_points_list, bias = self.get_tables(layout)
 			table_frames = []
+			in_table = [] # true / false
+			table_drawn = [] # true / false
 			for table_points in table_points_list:
 				tmp_frame = self.get_table_frame(table_points)
 				if tmp_frame.grids:
 					table_frames.append(tmp_frame)
+					table_drawn.append(False)
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
+					# in_table.append(-1) # -1 for not included in any table; else: the table frame's index
+					table_idx = -1
+					for line in x:
+						if (isinstance(line, LTTextLineHorizontal)):
+							for i in range(len(table_frames)):
+								# table_frames[i]
+								corner1 = (line.x0, line.y0)
+								corner2 = (line.x1, line.y1)
+								if table_frames[i].is_in_range(corner1) and table_frames[i].is_in_range(corner2):
+									table_idx = i
+									break
+							if table_idx != -1:
+								break
+					in_table.append(table_idx)
+					if table_idx != -1:
+						for line in x:
+							if (isinstance(line, LTTextLineHorizontal)):
+								# table_frames[table_idx]
+								corner1 = (line.x0, line.y0)
+								corner2 = (line.x1, line.y1)
+								text_line = re.sub(self.replace,'', line.get_text())
+								location = table_frames[table_idx].locate(corner1)
+								if (location):
+									# print location
+									# print text_line
+									# raw_input()
+									table_frames[table_idx].add_data(location, text_line)
+									# print "wrote content " + text_line + "to location {0}".format(location)
+			# for table in table_frames:
+			#	print table.data
+			# 	raw_input()
+			x_idx = -1
+			for x in layout:
+				if(isinstance(x, LTTextBoxHorizontal)): # if(isinstance(x, LTTextLineHorizontal)):
+					x_idx += 1
+					if in_table[x_idx] != -1:
+						if not table_drawn[in_table[x_idx]]:
+							# haven't drawn yet
+							self.draw_table(table_frames[in_table[x_idx]])
+						continue
 					fontname, fontsize, location, line_width = self.get_font(x)
 					text=re.sub(self.replace,'',x.get_text())
 					# text = x.get_text()
@@ -227,7 +270,7 @@ class simplePDF2HTML(PDF2HTML):
 									prev_text, prev_align, prev_size, prev_weight, prev_indent
 								))
 							prev_text = None
-						self.write('<p style="font-size:{2}px;font-weight:{3}text-indent:0.0em;" align="{1}">{0}</p>'.format( \
+						self.write('<p style="font-size:{2}px;font-weight:{3};text-indent:0.0em;" align="{1}">{0}</p>'.format( \
 								text, align, fontsize, fontweight
 							))
 			page_idx += 1
@@ -239,6 +282,19 @@ class simplePDF2HTML(PDF2HTML):
 		self.level -= 1
 		self.write('</body>')
 
+	def draw_table(self, table_frame):
+		data = table_frame.data
+		self.write('<table border="1" cellspacing="0" align="center">')
+		self.level += 1
+		for row in data:
+			self.write('<tr>')
+			self.level += 1
+			for content in row:
+				self.write('<td>{0}</td>'.format("<br>".join(content)))
+			self.level -= 1
+			self.write('</tr>')
+		self.level -= 1
+		self.write('</table>')
 
 	def get_font(self, x):
 		default_fontname = self.chinese_str('ABCDEE+宋体')
@@ -541,19 +597,9 @@ class simplePDF2HTML(PDF2HTML):
 						pt2 = (fixed_x, bottom)
 					# update data
 					if pt1 not in raw_points.keys():
-						#####
-						# print pt1
-						# draw.dot(pt1[0], pt1[1], size=15, color_string="green")
-						# raw_input()
-						#######
 						raw_points[pt1] = []
 						points_visited[pt1] = False
 					if pt2 not in raw_points.keys():
-						######
-						# print pt2
-						# draw.dot(pt2[0], pt2[1], size=15, color_string="green")
-						# raw_input()
-						########
 						raw_points[pt2] = []
 						points_visited[pt2] = False
 					tmp_idx_line = len(raw_lines)
@@ -681,6 +727,7 @@ class TableFrame(object):
 		self.bias = bias
 		self.grids = {"x": [], "y": []}
 		self.data = [] # content, [['XXX', 'XXX'],['XXX', 'XXX']...]
+		self.range = {"max_x": -1, "max_y": -1, "min_x": 0, "min_y": 0}
 		for point in table_points_list:
 			x = point[0]
 			y = point[1]
@@ -689,7 +736,9 @@ class TableFrame(object):
 			if y not in self.grids['y']:
 				self.grids['y'].append(y)
 		self.grids['x'].sort()
-		self.grids['y'].sort()
+		self.grids['y'].sort(reverse=True)
+		# print self.grids['x']
+		# print self.grids['y']
 		# assert len(self.grids['x']) > 1 and len(self.grids['y']) > 1, "the table data does not represent an area"
 		if len(table_points_list) <= 2 or len(self.grids['x']) <= 1 or len(self.grids['y']) <= 1:
 			self.grids = None
@@ -701,6 +750,13 @@ class TableFrame(object):
 				for j in range(n_cols):
 					empty_line.append([])
 				self.data.append(empty_line)
+			corner1 = table_points_list[0]
+			corner2 = table_points_list[len(table_points_list) - 1]
+			self.range['max_x'] = max(corner1[0], corner2[0])
+			self.range['max_y'] = max(corner1[1], corner2[1])
+			self.range['min_x'] = min(corner1[0], corner2[0])
+			self.range['min_y'] = min(corner1[1], corner2[1])
+
 	def locate(self, point):
 		def greater_than(a, b):
 			if a + self.bias > b:
@@ -717,17 +773,46 @@ class TableFrame(object):
 		y_idx = -1
 		n_x = len(self.grids['x'])
 		n_y = len(self.grids['y'])
+		# print n_x, n_y
+		# print self.grids['x']
+		# print self.grids['y']
 		for i in range(1, n_x):
+			# print "compare {0} with {1} and {2}".format(x, self.grids['x'][i - 1], self.grids['x'][i])
 			if greater_than(x, self.grids['x'][i - 1]) and smaller_than(x, self.grids['x'][i]):
 				x_idx = i - 1
 				break
 		for i in range(1, n_y):
-			if greater_than(y, self.grids['y'][i - 1]) and smaller_than(y, self.grids['y'][i]):
+			# print "compare {0} with {1} and {2}".format(y, self.grids['y'][i - 1], self.grids['y'][i])
+			if smaller_than(y, self.grids['y'][i - 1]) and greater_than(y, self.grids['y'][i]):
 				y_idx = i - 1
 				break
+		# print x_idx, y_idx
 		if x_idx == -1 or y_idx == -1:
 			return None
-		return (x_idx, y_idx)
+		return (y_idx, x_idx) # row, col
+
+	def is_in_range(self, point):
+		def greater_than(a, b):
+			if a + self.bias > b:
+				return True
+			return False
+		def smaller_than(a, b):
+			if a < b + self.bias:
+				return True
+			return False
+		# point: (x, y)
+		x = point[0]
+		y = point[1]
+		x_idx = -1
+		if greater_than(x, self.range['min_x']) and smaller_than(x, self.range['max_x'])\
+		  and greater_than(y, self.range['min_y']) and smaller_than(y, self.range['max_y']):
+			return True
+		return False
+
+	def add_data(self, location, content):
+		row = location[0]
+		col = location[1]
+		self.data[row][col].append(content)
 
 class Draw(object):
 	def __init__(self, size_x, size_y, offset_x, offset_y):
