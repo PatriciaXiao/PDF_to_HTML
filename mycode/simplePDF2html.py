@@ -189,6 +189,7 @@ class simplePDF2HTML(PDF2HTML):
 				if tmp_frame.grids:
 					table_frames.append(tmp_frame)
 					table_drawn.append(False)
+					# print tmp_frame.grids
 			# print table_frames
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
@@ -214,16 +215,17 @@ class simplePDF2HTML(PDF2HTML):
 								for char in line:
 									if isinstance(char, LTChar):
 										text_line = re.sub(self.replace,'', char.get_text())
-										corner1 = (char.x0, char.y0)
-										corner2 = (char.x1, char.y1)
-										location = table_frames[table_idx].locate(corner2)
-										# print location, text_line
-										# raw_input()
-										if (location):
-											if location in parts.keys():
-												parts[location] += text_line
-											else:
-												parts[location] = text_line
+										if len(text_line):
+											corner1 = (char.x0, char.y0)
+											corner2 = (char.x1, char.y1)
+											location = table_frames[table_idx].locate(corner2)
+											# print location, text_line
+											# raw_input()
+											if (location):
+												if location in parts.keys():
+													parts[location] += text_line
+												else:
+													parts[location] = text_line
 								for location in parts.keys():
 									table_frames[table_idx].add_data(location, parts[location])
 									if table_frames[table_idx].font[location[0]][location[1]] == None:
@@ -421,14 +423,16 @@ class simplePDF2HTML(PDF2HTML):
 			return True
 
 	def is_line(self, rect_elem):
-		threshold = 2
-		if (rect_elem.x1 - rect_elem.x0) < threshold:
-			if (rect_elem.y1 - rect_elem.y0) > 3 * threshold:
+		threshold = 2 #2
+		x_diff = rect_elem.x1 - rect_elem.x0
+		y_diff = rect_elem.y1 - rect_elem.y0
+		if x_diff < threshold:
+			if y_diff > 3 * threshold:
 				return "y"
 			else:
 				return "point"
-		if (rect_elem.y1 - rect_elem.y0) < threshold:
-			if (rect_elem.x1 - rect_elem.x0) > 3 * threshold:
+		if y_diff < threshold:
+			if x_diff > 3 * threshold:
 				return "x"
 			else:
 				return "point"
@@ -622,6 +626,14 @@ class simplePDF2HTML(PDF2HTML):
 						raw_points[pt1].append(tmp_idx_line)
 						raw_points[pt2].append(tmp_idx_line)
 				else: # a rectangle
+					if idx_left == -1:
+						raw_points_x.append(left)
+					if idx_right == -1:
+						raw_points_x.append(right)
+					if idx_top == -1:
+						raw_points_y.append(top)
+					if idx_bottom == -1:
+						raw_points_y.append(bottom)
 					pt1 = (left, top)
 					pt2 = (right, top)
 					pt3 = (right, bottom)
