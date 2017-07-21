@@ -231,6 +231,13 @@ class simplePDF2HTML(PDF2HTML):
 									table_frames[table_idx].add_data(location, parts[location])
 									if table_frames[table_idx].font[location[0]][location[1]] == None:
 										table_frames[table_idx].font[location[0]][location[1]] = int(line.y1 - line.y0)
+			# print in_table
+			for i in range(len(table_frames)):
+				if len(table_frames[i].data) <= 1:
+					# not a real table, dirty data
+					for j in range(len(in_table)):
+						if in_table[j] == i:
+							in_table[j] = -1
 			# 写入表格内容以外的其他内容
 			x_idx = -1
 			for x in layout:
