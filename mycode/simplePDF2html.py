@@ -185,10 +185,11 @@ class simplePDF2HTML(PDF2HTML):
 			in_table = [] # true / false
 			table_drawn = [] # true / false
 			for table_points in table_points_list:
-				tmp_frame = self.get_table_frame(table_points)
+				tmp_frame = self.get_table_frame(table_points, bias)
 				if tmp_frame.grids:
 					table_frames.append(tmp_frame)
 					table_drawn.append(False)
+			# print table_frames
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					# in_table.append(-1) # -1 for not included in any table; else: the table frame's index
@@ -209,18 +210,25 @@ class simplePDF2HTML(PDF2HTML):
 						for line in x:
 							if (isinstance(line, LTTextLineHorizontal)):
 								# table_frames[table_idx]
-								corner1 = (line.x0, line.y0)
-								corner2 = (line.x1, line.y1)
-								text_line = re.sub(self.replace,'', line.get_text())
-								location = table_frames[table_idx].locate(corner1)
-								if (location):
-									table_frames[table_idx].add_data(location, text_line)
+								parts = {} # location: text
+								for char in line:
+									if isinstance(char, LTChar):
+										text_line = re.sub(self.replace,'', char.get_text())
+										corner1 = (char.x0, char.y0)
+										corner2 = (char.x1, char.y1)
+										location = table_frames[table_idx].locate(corner2)
+										# print location, text_line
+										# raw_input()
+										if (location):
+											if location in parts.keys():
+												parts[location] += text_line
+											else:
+												parts[location] = text_line
+								for location in parts.keys():
+									table_frames[table_idx].add_data(location, parts[location])
 									if table_frames[table_idx].font[location[0]][location[1]] == None:
 										table_frames[table_idx].font[location[0]][location[1]] = int(line.y1 - line.y0)
-									# print "wrote content " + text_line + "to location {0}".format(location)
-			# for table in table_frames:
-			#	print table.data
-			# 	raw_input()
+			# 写入表格内容以外的其他内容
 			x_idx = -1
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)): # if(isinstance(x, LTTextLineHorizontal)):
@@ -229,6 +237,7 @@ class simplePDF2HTML(PDF2HTML):
 						if not table_drawn[in_table[x_idx]]:
 							# haven't drawn yet
 							self.draw_table(table_frames[in_table[x_idx]])
+							table_drawn[in_table[x_idx]] = True
 						continue
 					fontname, fontsize, location, line_width = self.get_font(x)
 					text=re.sub(self.replace,'',x.get_text())
@@ -722,8 +731,8 @@ class simplePDF2HTML(PDF2HTML):
 
 		return table_list, bias
 
-	def get_table_frame(self, table_points_list):
-		ret_val = TableFrame(table_points_list)
+	def get_table_frame(self, table_points_list, bias=10):
+		ret_val = TableFrame(table_points_list, bias)
 		return ret_val
 
 class TableFrame(object):
