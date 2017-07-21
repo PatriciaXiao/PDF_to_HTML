@@ -178,10 +178,14 @@ class simplePDF2HTML(PDF2HTML):
 			content_width = content_xrange[1] - content_xrange[0]
 			major_indents, map_indents, major_size = self.get_conclude(indent_list, fontsize_list)
 			typical_length = content_width / major_size
-			# raw_input()
-			# print table_info
-			self.show_page_layout(layout)
-			self.get_tables(layout)
+			# get table contents in advance
+			# self.show_page_layout(layout)
+			table_points_list, bias = self.get_tables(layout)
+			table_frames = []
+			for table_points in table_points_list:
+				tmp_frame = self.get_table_frame(table_points)
+				if tmp_frame.grids:
+					table_frames.append(tmp_frame)
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					fontname, fontsize, location, line_width = self.get_font(x)
@@ -646,8 +650,9 @@ class simplePDF2HTML(PDF2HTML):
 		while len(point_list.keys()):
 			next_starting_point = point_list.keys()[0]
 			next_group = recursively_get_group(next_starting_point)
-			next_group.sort()
-			table_list.append(next_group)
+			if len(next_group) > 2: # not a line
+				next_group.sort()
+				table_list.append(next_group)
 		
 
 		# test
@@ -665,6 +670,64 @@ class simplePDF2HTML(PDF2HTML):
 			raw_input()
 
 		return table_list, bias
+
+	def get_table_frame(self, table_points_list):
+		ret_val = TableFrame(table_points_list)
+		return ret_val
+
+class TableFrame(object):
+	def __init__(self, table_points_list, bias = 10):
+		# assert len(table_points_list) > 2, "the data passed in is not a table at all"
+		self.bias = bias
+		self.grids = {"x": [], "y": []}
+		self.data = [] # content, [['XXX', 'XXX'],['XXX', 'XXX']...]
+		for point in table_points_list:
+			x = point[0]
+			y = point[1]
+			if x not in self.grids['x']:
+				self.grids['x'].append(x)
+			if y not in self.grids['y']:
+				self.grids['y'].append(y)
+		self.grids['x'].sort()
+		self.grids['y'].sort()
+		# assert len(self.grids['x']) > 1 and len(self.grids['y']) > 1, "the table data does not represent an area"
+		if len(table_points_list) <= 2 or len(self.grids['x']) <= 1 or len(self.grids['y']) <= 1:
+			self.grids = None
+		else:
+			n_rows = len(self.grids['y']) - 1
+			n_cols = len(self.grids['x']) - 1
+			for i in range(n_rows):
+				empty_line = []
+				for j in range(n_cols):
+					empty_line.append([])
+				self.data.append(empty_line)
+	def locate(self, point):
+		def greater_than(a, b):
+			if a + self.bias > b:
+				return True
+			return False
+		def smaller_than(a, b):
+			if a < b + self.bias:
+				return True
+			return False
+		# point: (x, y)
+		x = point[0]
+		y = point[1]
+		x_idx = -1
+		y_idx = -1
+		n_x = len(self.grids['x'])
+		n_y = len(self.grids['y'])
+		for i in range(1, n_x):
+			if greater_than(x, self.grids['x'][i - 1]) and smaller_than(x, self.grids['x'][i]):
+				x_idx = i - 1
+				break
+		for i in range(1, n_y):
+			if greater_than(y, self.grids['y'][i - 1]) and smaller_than(y, self.grids['y'][i]):
+				y_idx = i - 1
+				break
+		if x_idx == -1 or y_idx == -1:
+			return None
+		return (x_idx, y_idx)
 
 class Draw(object):
 	def __init__(self, size_x, size_y, offset_x, offset_y):
