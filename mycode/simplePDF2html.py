@@ -245,6 +245,13 @@ class simplePDF2HTML(PDF2HTML):
 					x_idx += 1
 					if in_table[x_idx] != -1:
 						if not table_drawn[in_table[x_idx]]:
+							#########
+							if prev_text:
+								self.write('<p style="font-size:{2}px;font-weight:{3};text-indent:{4}em;" align="{1}">{0}</p>'.format( \
+										prev_text, prev_align, prev_size, prev_weight, prev_indent
+									))
+							prev_text = None
+							#########
 							# haven't drawn yet
 							self.draw_table(table_frames[in_table[x_idx]])
 							table_drawn[in_table[x_idx]] = True
