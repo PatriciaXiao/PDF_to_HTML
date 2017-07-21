@@ -180,7 +180,7 @@ class simplePDF2HTML(PDF2HTML):
 			typical_length = content_width / major_size
 			# raw_input()
 			# print table_info
-			# self.show_page_layout(layout)
+			self.show_page_layout(layout)
 			self.get_tables(layout)
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
@@ -348,10 +348,16 @@ class simplePDF2HTML(PDF2HTML):
 
 	def is_line(self, rect_elem):
 		threshold = 2
-		if (rect_elem.x1 - rect_elem.x0) < threshold and (rect_elem.y1 - rect_elem.y0) > 3 * threshold:
-			return "y"
-		if (rect_elem.y1 - rect_elem.y0) < threshold and (rect_elem.x1 - rect_elem.x0) > 3 * threshold:
-			return "x"
+		if (rect_elem.x1 - rect_elem.x0) < threshold:
+			if (rect_elem.y1 - rect_elem.y0) > 3 * threshold:
+				return "y"
+			else:
+				return "point"
+		if (rect_elem.y1 - rect_elem.y0) < threshold:
+			if (rect_elem.x1 - rect_elem.x0) > 3 * threshold:
+				return "x"
+			else:
+				return "point"
 		return False
 
 	def show_page_layout(self, layout):
@@ -375,6 +381,8 @@ class simplePDF2HTML(PDF2HTML):
 			if(isinstance(x, LTTextBoxHorizontal)):
 				for line in x:
 					# print line # LTTextLine
+					draw.set_color("green")
+					draw.square(line.x0, line.x1, line.y1, line.y0)
 					for char in line:
 						# print char # LTChar / LTAnno
 						if isinstance(char, LTChar):
@@ -408,20 +416,10 @@ class simplePDF2HTML(PDF2HTML):
 		raw_input()
 		return layout
 
-	
-	def get_pts_max_dist(self, pt1, pt2):
-		assert len(pt1) == 2, "point 1 position {0}'s length is not 2".format(pt1)
-		assert len(pt2) == 2, "point 2 position {0}'s length is not 2".format(pt2)
-		return max(abs(pt1[0] - pt2[0]), abs(pt1[1] - pt2[1]))
-
 	def get_closest_idx(self, goal_value, lst, threshold):
 		closest_idx = -1
 		for i in range(len(lst)):
 			item = lst[i]
-			#######
-			if goal_value == 581:
-				print "compare {0} with {1}".format(goal_value, lst[i])
-			#######
 			if abs(item - goal_value) <= threshold:
 				closest_idx = i
 				break
@@ -430,18 +428,20 @@ class simplePDF2HTML(PDF2HTML):
 	
 
 	def get_tables(self, layout):
-		page_range = {
-			"left": layout.x0,
-			"right": layout.x1,
-			"top": layout.y1,
-			"bottom": layout.y0
-		}
-		offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
-		offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
-		size_x = 1.5 * (page_range["right"] - page_range["left"])
-		size_y = 1.5 * (page_range["top"] - page_range["bottom"])
-		draw = Draw(size_x, size_y, offset_x, offset_y)
-		draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		debug = False
+		if debug:
+			page_range = {
+				"left": layout.x0,
+				"right": layout.x1,
+				"top": layout.y1,
+				"bottom": layout.y0
+			}
+			offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
+			offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
+			size_x = 1.5 * (page_range["right"] - page_range["left"])
+			size_y = 1.5 * (page_range["top"] - page_range["bottom"])
+			draw = Draw(size_x, size_y, offset_x, offset_y)
+			draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		# get the maximum value of the line stroke width
 		max_stroke = -1
 		raw_lines = [] # contents: ((x1, y1), (x2, y2))
@@ -498,14 +498,12 @@ class simplePDF2HTML(PDF2HTML):
 				if idx_bottom >= 0:
 					bottom = raw_points_y[idx_bottom]
 
-				###########
-				# if left
-				###########
-
 				isLine = self.is_line(x)
 				if isLine: # a line
 					# fetch data
-					if isLine == 'x':
+					if isLine == 'point':
+						continue
+					elif isLine == 'x':
 						# print 'x'
 						if idx_left == -1:
 							raw_points_x.append(left)
@@ -608,68 +606,65 @@ class simplePDF2HTML(PDF2HTML):
 
 		point_list = raw_points.copy()
 
-		def debug_walk(tmp_point):
-			if points_visited[tmp_point]:
-				return
-			points_visited[tmp_point] = True
-			draw.dot(tmp_point[0], tmp_point[1], size=15, color_string="green")
-			next_links = point_list[tmp_point]
-			for idx in next_links:
-				line = raw_lines[idx]
-				debug_walk(line[0])
-				debug_walk(line[1])
-		test_point = point_list.keys()[0]
-		test_value = point_list[test_point]
-		# debug_walk(test_point)
+		if debug:
+			def debug_walk(tmp_point):
+				if points_visited[tmp_point]:
+					return
+				points_visited[tmp_point] = True
+				draw.dot(tmp_point[0], tmp_point[1], size=15, color_string="green")
+				next_links = point_list[tmp_point]
+				for idx in next_links:
+					line = raw_lines[idx]
+					debug_walk(line[0])
+					debug_walk(line[1])
+			test_point = point_list.keys()[0]
+			test_value = point_list[test_point]
+			debug_walk(test_point)
 
-		'''
 		def recursively_get_group(tmp_point):
-			next_list = [] # content: (x, y)
 			ret_val = []
 			# if the point has already been visited
-			if points_visited[tmp_point]:
-				return []
-			else:
+			if not points_visited[tmp_point]:
 				points_visited[tmp_point] = True
 				ret_val.append(tmp_point)
-			# get the neighbours
-			next_idx_lst = point_list.pop(tmp_point)
-			for idx in next_idx_lst:
-				line = raw_lines[idx]
-				# draw.dot(line[0][0], line[0][1], size=15, color_string="green")
-				# draw.dot(line[1][0], line[1][1], size=15, color_string="green")
-				
-				next_point = line[0]
-				if next_point == tmp_point:
-					next_point = line[1]
-				if points_visited[next_point]: 
-					continue
-				next_list.append(next_point)
-				# draw.dot(next_point[0], next_point[1], size=15, color_string="green")
-				
-			# returning
-			if len(next_list) > 0: # no temporary next candidates left
-				ret_val = recursively_get_group(next_list[0])
-				for i in range(1, len(next_list)):
-					ret_val.extend(recursively_get_group(next_list[i]))
+				# get the neighbours
+				next_idx_lst = point_list.pop(tmp_point)
+				for idx in next_idx_lst:
+					line = raw_lines[idx]				
+					next_point = line[0]
+					if next_point == tmp_point:
+						next_point = line[1]
+					if points_visited[next_point]: 
+						continue
+					next_list = recursively_get_group(next_point)
+					ret_val.extend(next_list)
+					# draw.dot(next_point[0], next_point[1], size=15, color_string="green")
+						
 			return ret_val
 
-		print len(point_list)
-		test_point = point_list.keys()[0]
-		test_value = point_list[test_point]
-		print test_point, test_value
-		test_set = recursively_get_group(test_point)
-		print test_set
-		print len(point_list)
-		for pt in test_set:
-			draw.dot(pt[0], pt[1], size=10, color_string="red")
-		'''
+		table_list = []
+		while len(point_list.keys()):
+			next_starting_point = point_list.keys()[0]
+			next_group = recursively_get_group(next_starting_point)
+			next_group.sort()
+			table_list.append(next_group)
+		
 
 		# test
-		for line in raw_lines:
-			draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
-		raw_input()
-		return layout
+		if debug:
+			for table in table_list:
+				for pt in table:
+			 		draw.dot(pt[0], pt[1], size=10, color_string="red")
+			 	# raw_input()
+			for table in table_list:
+				n_pts = len(table)
+				draw.dot(table[0][0], table[0][1], size=10, color_string="red")
+				draw.dot(table[n_pts - 1][0], table[n_pts - 1][1], size=10, color_string="red")
+			for line in raw_lines:
+				draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
+			raw_input()
+
+		return table_list, bias
 
 class Draw(object):
 	def __init__(self, size_x, size_y, offset_x, offset_y):
