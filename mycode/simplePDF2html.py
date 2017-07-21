@@ -535,7 +535,7 @@ class simplePDF2HTML(PDF2HTML):
 				top = int(top)
 				bottom = int(bottom)
 				isLine = self.is_line(x)
-				if isLine: # a line
+				if isLine == 'x' or isLine == 'y': # a line
 					# fetch data
 					if isLine == 'x':
 						line_stroke = top - bottom
