@@ -214,10 +214,9 @@ class simplePDF2HTML(PDF2HTML):
 								text_line = re.sub(self.replace,'', line.get_text())
 								location = table_frames[table_idx].locate(corner1)
 								if (location):
-									# print location
-									# print text_line
-									# raw_input()
 									table_frames[table_idx].add_data(location, text_line)
+									if table_frames[table_idx].font[location[0]][location[1]] == None:
+										table_frames[table_idx].font[location[0]][location[1]] = int(line.y1 - line.y0)
 									# print "wrote content " + text_line + "to location {0}".format(location)
 			# for table in table_frames:
 			#	print table.data
@@ -284,13 +283,19 @@ class simplePDF2HTML(PDF2HTML):
 
 	def draw_table(self, table_frame):
 		data = table_frame.data
+		font = table_frame.font
 		self.write('<table border="1" cellspacing="0" align="center">')
 		self.level += 1
-		for row in data:
+		for i in range(len(data)):
 			self.write('<tr>')
 			self.level += 1
-			for content in row:
-				self.write('<td>{0}</td>'.format("<br>".join(content)))
+			for j in range(len(data[i])):
+				content = data[i][j]
+				fontsize = font[i][j]
+				if fontsize:
+					self.write('<td style="font-size: {1}px;">{0}</td>'.format("<br>".join(content), fontsize))
+				else:
+					self.write('<td>{0}</td>'.format("<br>".join(content), fontsize))
 			self.level -= 1
 			self.write('</tr>')
 		self.level -= 1
@@ -727,6 +732,7 @@ class TableFrame(object):
 		self.bias = bias
 		self.grids = {"x": [], "y": []}
 		self.data = [] # content, [['XXX', 'XXX'],['XXX', 'XXX']...]
+		self.font = []
 		self.range = {"max_x": -1, "max_y": -1, "min_x": 0, "min_y": 0}
 		for point in table_points_list:
 			x = point[0]
@@ -747,9 +753,12 @@ class TableFrame(object):
 			n_cols = len(self.grids['x']) - 1
 			for i in range(n_rows):
 				empty_line = []
+				empty_font = []
 				for j in range(n_cols):
 					empty_line.append([])
+					empty_font.append(None)
 				self.data.append(empty_line)
+				self.font.append(empty_font)
 			corner1 = table_points_list[0]
 			corner2 = table_points_list[len(table_points_list) - 1]
 			self.range['max_x'] = max(corner1[0], corner2[0])
