@@ -217,8 +217,8 @@ class simplePDF2HTML(PDF2HTML):
 									if isinstance(char, LTChar):
 										text_line = re.sub(self.replace,'', char.get_text())
 										if len(text_line):
-											corner1 = (char.x0, char.y0)
-											corner2 = (char.x1, char.y1)
+											corner1 = (char.x0, char.y1)
+											corner2 = (char.x1, char.y0)
 											location = table_frames[table_idx].locate(corner2)
 											# print location, text_line
 											# raw_input()
