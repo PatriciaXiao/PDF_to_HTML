@@ -12,6 +12,7 @@ from pdfminer.layout import *
 import re
 import operator # 为了排序
 import turtle # 为了可视化显示检测到的布局
+import copy
 
 import sys, gc
 
@@ -293,8 +294,8 @@ class simplePDF2HTML(PDF2HTML):
 		self.write('</body>')
 
 	def draw_table(self, table_frame):
-		data = table_frame.data
-		font = table_frame.font
+		# data = table_frame.data
+		data, font = table_frame.get_clean_data()
 		self.write('<table border="1" cellspacing="0" align="center">')
 		self.level += 1
 		for i in range(len(data)):
@@ -820,6 +821,22 @@ class TableFrame(object):
 		if x_idx == -1 or y_idx == -1:
 			return None
 		return (y_idx, x_idx) # row, col
+
+	def get_clean_data(self):
+		clean_data = []
+		clean_fonts = []
+		for i in range(len(self.data)):
+			line = self.data[i]
+			empty = True
+			for elem in line:
+				if len(elem):
+					empty = False
+					break
+			if not empty:
+				clean_data.append(copy.copy(line))
+				clean_fonts.append(copy.copy(self.font[i]))
+		return clean_data, clean_fonts
+
 
 	def is_in_range(self, point):
 		def greater_than(a, b):
