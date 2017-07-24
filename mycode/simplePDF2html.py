@@ -738,6 +738,7 @@ class simplePDF2HTML(PDF2HTML):
 			return ret_val
 
 		table_list = []
+		table_line_list = [] # lines that belong to a specific table
 		divider_list = [] # the lines
 		while len(point_list.keys()):
 			next_starting_point = point_list.keys()[0]
@@ -746,18 +747,41 @@ class simplePDF2HTML(PDF2HTML):
 				next_group.sort()
 				table_list.append(next_group)
 				divider_list.append([])
+				table_line_list.append([])
 		
 		# get the lines' list
-		raw_points_x.sort()
-		raw_points_y.sort()
-		print "*************************"
-		print raw_lines
-		print raw_points_x
-		print raw_points_y
-		print "*************************"
+		for line in raw_lines:
+			for i in range(len(table_list)):
+				if line[0] in table_list[i] or line[1] in table_list[i]:
+					table_line_list[i].append(line)
+					break
+		# print table_line_list
+
+		# get the regularized lines
 		for i in range(len(table_list)):
+			tmp_xs = []
+			tmp_ys = []
 			tmp_table = table_list[i]
-			print tmp_table
+			tmp_lines = table_line_list[i]
+			# print tmp_table
+			for pt in tmp_table:
+				pt_x = pt[0]
+				pt_y = pt[1]
+				if pt_x not in tmp_xs:
+					tmp_xs.append(pt_x)
+				if pt_y not in tmp_ys:
+					tmp_ys.append(pt_y)
+			tmp_xs.sort()
+			tmp_ys.sort()
+			print tmp_xs
+			print tmp_ys
+			for line in tmp_lines:
+				pt1 = min(line[0], line[1])
+				pt2 = max(line[0], line[1])
+				if pt1[0] == pt2[0]: # same x
+					start_line_idx = -1
+					end_line_idx = -1
+					print pt1, pt2
 
 
 		# test
