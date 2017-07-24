@@ -602,6 +602,7 @@ class simplePDF2HTML(PDF2HTML):
 						# print 'x'
 						if idx_left == -1:
 							raw_points_x.append(left)
+						idx_right = self.get_closest_idx(right, raw_points_x, bias)
 						if idx_right == -1:
 							raw_points_x.append(right)
 						fixed_y = (top + bottom) / 2.0
@@ -618,6 +619,7 @@ class simplePDF2HTML(PDF2HTML):
 						# print 'y'
 						if idx_top == -1:
 							raw_points_y.append(top)
+						idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
 						if idx_bottom == -1:
 							raw_points_y.append(bottom)
 						fixed_x = (left + right) / 2.0
