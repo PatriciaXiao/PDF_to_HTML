@@ -309,7 +309,7 @@ class simplePDF2HTML(PDF2HTML):
 
 	def draw_table(self, table_frame):
 		# data = table_frame.data
-		data, font = table_frame.get_clean_data()
+		data, font, rowspan, colspan = table_frame.get_clean_data()
 		self.write('<table border="1" cellspacing="0" align="center">')
 		self.level += 1
 		for i in range(len(data)):
@@ -318,10 +318,12 @@ class simplePDF2HTML(PDF2HTML):
 			for j in range(len(data[i])):
 				content = data[i][j]
 				fontsize = font[i][j]
+				rs = rowspan[i][j]
+				cs = colspan[i][j]
 				if fontsize:
-					self.write('<td style="font-size: {1}px;">{0}</td>'.format("<br>".join(content), fontsize))
+					self.write('<td style="font-size: {1}px;" rowspan="{2}" colspan="{3}">{0}</td>'.format("<br>".join(content), fontsize, rs, cs))
 				else:
-					self.write('<td>{0}</td>'.format("<br>".join(content), fontsize))
+					self.write('<td rowspan="{1}" colspan="{2}">{0}</td>'.format("<br>".join(content), rs, cs))
 			self.level -= 1
 			self.write('</tr>')
 		self.level -= 1
@@ -438,7 +440,7 @@ class simplePDF2HTML(PDF2HTML):
 			return True
 
 	def is_line(self, rect_elem):
-		threshold = 2 #2
+		threshold = 3 #2
 		x_diff = rect_elem.x1 - rect_elem.x0
 		y_diff = rect_elem.y1 - rect_elem.y0
 		if x_diff < threshold:
@@ -516,7 +518,6 @@ class simplePDF2HTML(PDF2HTML):
 			if abs(item - goal_value) <= threshold:
 				closest_idx = i
 				break
-		# print closest_idx
 		return closest_idx
 	
 
@@ -590,6 +591,7 @@ class simplePDF2HTML(PDF2HTML):
 					top = raw_points_y[idx_top]
 				if idx_bottom >= 0:
 					bottom = raw_points_y[idx_bottom]
+
 
 				isLine = self.is_line(x)
 				if isLine: # a line
@@ -734,13 +736,27 @@ class simplePDF2HTML(PDF2HTML):
 			return ret_val
 
 		table_list = []
+		divider_list = [] # the lines
 		while len(point_list.keys()):
 			next_starting_point = point_list.keys()[0]
 			next_group = recursively_get_group(next_starting_point)
 			if len(next_group) > 2: # not a line
 				next_group.sort()
 				table_list.append(next_group)
+				divider_list.append([])
 		
+		# get the lines' list
+		raw_points_x.sort()
+		raw_points_y.sort()
+		print "*************************"
+		print raw_lines
+		print raw_points_x
+		print raw_points_y
+		print "*************************"
+		for i in range(len(table_list)):
+			tmp_table = table_list[i]
+			print tmp_table
+
 
 		# test
 		if debug:
@@ -769,6 +785,9 @@ class TableFrame(object):
 		self.grids = {"x": [], "y": []}
 		self.data = [] # content, [['XXX', 'XXX'],['XXX', 'XXX']...]
 		self.font = []
+		self.rowspan = []
+		self.colspan = []
+		self.location_map = {} # content: [(x_location, y_location): (x_data, y_data)]
 		self.range = {"max_x": -1, "max_y": -1, "min_x": 0, "min_y": 0}
 		for point in table_points_list:
 			x = point[0]
@@ -790,11 +809,18 @@ class TableFrame(object):
 			for i in range(n_rows):
 				empty_line = []
 				empty_font = []
+				empty_rowspan = []
+				empty_colspan = []
 				for j in range(n_cols):
 					empty_line.append([])
 					empty_font.append(None)
+					empty_rowspan.append(1)
+					empty_colspan.append(1)
+					self.location_map[(i, j)] = (i, j)
 				self.data.append(empty_line)
 				self.font.append(empty_font)
+				self.rowspan.append(empty_rowspan)
+				self.colspan.append(empty_colspan)
 			corner1 = table_points_list[0]
 			corner2 = table_points_list[len(table_points_list) - 1]
 			self.range['max_x'] = max(corner1[0], corner2[0])
@@ -834,11 +860,14 @@ class TableFrame(object):
 		# print x_idx, y_idx
 		if x_idx == -1 or y_idx == -1:
 			return None
-		return (y_idx, x_idx) # row, col
+		(row, col) = self.location_map[(y_idx, x_idx)]
+		return (row, col) # row, col
 
 	def get_clean_data(self):
 		clean_data = []
 		clean_fonts = []
+		clean_rowspan = []
+		clean_colspan = []
 		for i in range(len(self.data)):
 			line = self.data[i]
 			empty = True
@@ -849,7 +878,9 @@ class TableFrame(object):
 			if not empty:
 				clean_data.append(copy.copy(line))
 				clean_fonts.append(copy.copy(self.font[i]))
-		return clean_data, clean_fonts
+				clean_rowspan.append(copy.copy(self.rowspan[i]))
+				clean_colspan.append(copy.copy(self.colspan[i]))
+		return clean_data, clean_fonts, clean_rowspan, clean_colspan
 
 
 	def is_in_range(self, point):
