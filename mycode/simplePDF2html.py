@@ -181,12 +181,13 @@ class simplePDF2HTML(PDF2HTML):
 			typical_length = content_width / major_size
 			# get table contents in advance
 			# self.show_page_layout(layout)
-			table_points_list, bias = self.get_tables(layout)
+			table_points_list, bias, table_divider_list = self.get_tables(layout)
 			table_frames = []
 			in_table = [] # true / false
 			table_drawn = [] # true / false
-			for table_points in table_points_list:
-				tmp_frame = self.get_table_frame(table_points, bias)
+			for i in range(len(table_points_list)):
+				table_points = table_points_list[i]
+				tmp_frame = self.get_table_frame(table_points, bias, table_divider_list[i])
 				if tmp_frame.grids:
 					table_frames.append(tmp_frame)
 					table_drawn.append(False)
@@ -522,7 +523,7 @@ class simplePDF2HTML(PDF2HTML):
 	
 
 	def get_tables(self, layout):
-		debug = False
+		debug = False #True
 		if debug:
 			page_range = {
 				"left": layout.x0,
@@ -699,9 +700,10 @@ class simplePDF2HTML(PDF2HTML):
 		assert len(points_visited.keys()) == len(raw_points.keys()), "points amount and points list length do not match"
 
 
-		point_list = raw_points.copy()
-
+		
+		
 		if debug:
+			point_list = raw_points.copy()
 			def debug_walk(tmp_point):
 				if points_visited[tmp_point]:
 					return
@@ -715,6 +717,9 @@ class simplePDF2HTML(PDF2HTML):
 			test_point = point_list.keys()[0]
 			test_value = point_list[test_point]
 			debug_walk(test_point)
+
+
+		point_list = raw_points.copy()
 
 		def recursively_get_group(tmp_point):
 			ret_val = []
@@ -773,18 +778,50 @@ class simplePDF2HTML(PDF2HTML):
 					tmp_ys.append(pt_y)
 			tmp_xs.sort()
 			tmp_ys.sort()
-			print tmp_xs
-			print tmp_ys
+			# print tmp_xs
+			# print tmp_ys
 			for line in tmp_lines:
 				pt1 = min(line[0], line[1])
 				pt2 = max(line[0], line[1])
 				if pt1[0] == pt2[0]: # same x
 					start_line_idx = -1
 					end_line_idx = -1
-					print pt1, pt2
+					# print pt1, pt2
+					for idx in range(len(tmp_ys)):
+						if tmp_ys[idx] == pt1[1]:
+							start_line_idx = idx
+						elif tmp_ys[idx] == pt2[1]:
+							end_line_idx = idx
+							break # sorted
+					assert start_line_idx != -1 and end_line_idx != -1, "error happend when building the frame of the table"
+					for idx in range(start_line_idx, end_line_idx):
+						tmp_pt1 = (pt1[0], tmp_ys[idx])
+						tmp_pt2 = (pt1[0], tmp_ys[idx + 1])
+						if (tmp_pt1, tmp_pt2) not in divider_list[i] and (tmp_pt2, tmp_pt1) not in divider_list[i]:
+							divider_list[i].append( (tmp_pt1, tmp_pt2) )
+				elif pt1[1] == pt2[1]: # same y
+					start_line_idx = -1
+					end_line_idx = -1
+					# print pt1, pt2
+					for idx in range(len(tmp_xs)):
+						if tmp_xs[idx] == pt1[0]:
+							start_line_idx = idx
+						elif tmp_xs[idx] == pt2[0]:
+							end_line_idx = idx
+							break # because it was sorted
+					assert start_line_idx != -1 and end_line_idx != -1, "error happend when building the frame of the table"
+					for idx in range(start_line_idx, end_line_idx):
+						tmp_pt1 = (tmp_xs[idx], pt1[1])
+						tmp_pt2 = (tmp_xs[idx + 1], pt1[1])
+						if (tmp_pt1, tmp_pt2) not in divider_list[i] and (tmp_pt2, tmp_pt1) not in divider_list[i]:
+							divider_list[i].append( (tmp_pt1, tmp_pt2) )
+				else:
+					assert False, "seems that it is not a regular table"
+			# print divider_list[i]
 
 
 		# test
+		
 		if debug:
 			for table in table_list:
 				for pt in table:
@@ -797,15 +834,26 @@ class simplePDF2HTML(PDF2HTML):
 			for line in raw_lines:
 				draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
 			raw_input()
+		
+		if debug:
+			# debug
+			for divider in divider_list[0]:
+				print divider
+				start = divider[0]
+				end = divider[1]
+				draw.set_color("red")
+				print start[0], start[1], end[0], end[1]
+				draw.line(start[0], start[1], end[0], end[1])
+		
 
-		return table_list, bias
+		return table_list, bias, divider_list
 
-	def get_table_frame(self, table_points_list, bias=10):
-		ret_val = TableFrame(table_points_list, bias)
+	def get_table_frame(self, table_points_list, bias, table_divider_list):
+		ret_val = TableFrame(table_points_list, bias, table_divider_list)
 		return ret_val
 
 class TableFrame(object):
-	def __init__(self, table_points_list, bias = 10):
+	def __init__(self, table_points_list, bias, table_divider_list):
 		# assert len(table_points_list) > 2, "the data passed in is not a table at all"
 		self.bias = bias
 		self.grids = {"x": [], "y": []}
@@ -830,6 +878,8 @@ class TableFrame(object):
 		if len(table_points_list) <= 2 or len(self.grids['x']) <= 1 or len(self.grids['y']) <= 1:
 			self.grids = None
 		else:
+			# get the structure of the table
+			# print table_divider_list
 			n_rows = len(self.grids['y']) - 1
 			n_cols = len(self.grids['x']) - 1
 			for i in range(n_rows):
@@ -837,12 +887,57 @@ class TableFrame(object):
 				empty_font = []
 				empty_rowspan = []
 				empty_colspan = []
+				tmp_col = 0
 				for j in range(n_cols):
-					empty_line.append([])
-					empty_font.append(None)
-					empty_rowspan.append(1)
-					empty_colspan.append(1)
-					self.location_map[(i, j)] = (i, j)
+					# print "up, down, left, right"
+					# print self.grids['y'][i], self.grids['y'][i + 1], self.grids['x'][j], self.grids['x'][j + 1]
+					upperleft_corner = (self.grids['x'][j], self.grids['y'][i])
+					lowerleft_corner = (self.grids['x'][j], self.grids['y'][i + 1])
+					upperright_corner = (self.grids['x'][j + 1], self.grids['y'][i])
+					lowerright_corner = (self.grids['x'][j + 1], self.grids['y'][i + 1])
+					upper_connected = False
+					left_connected = False
+					
+					if i > 0:
+						# possible that rowspan > 0
+						if (upperleft_corner, upperright_corner) not in table_divider_list and \
+						  (upperright_corner, upperleft_corner) not in table_divider_list:
+							# connected to the upper grid
+							upper_connected = True
+					if j > 0:
+						# possible that colspan > 0
+						if (lowerleft_corner, upperleft_corner) not in table_divider_list and \
+						  (upperleft_corner, lowerleft_corner) not in table_divider_list:
+							# connected to the left grid
+							left_connected = True
+
+					print i, j, upper_connected, left_connected
+
+					# upper_connected = False
+					# left_connected = False
+
+					if upper_connected and left_connected:
+						self.location_map[(i, j)] = self.location_map[(i - 1, j)]
+					elif upper_connected:
+						self.location_map[(i, j)] = self.location_map[(i - 1, j)]
+						representer_i = self.location_map[(i - 1, j)][0]
+						representer_j = self.location_map[(i - 1, j)][1]
+						self.rowspan[representer_i][representer_j] += 1
+						
+					elif left_connected:
+						self.location_map[(i, j)] = self.location_map[i, (j - 1)]
+						representer_i = self.location_map[(i, j - 1)][0]
+						representer_j = self.location_map[(i, j - 1)][1]
+						# self.colspan[representer_i][representer_j] += 1
+						empty_colspan[representer_j] += 1
+
+					else: # the starting grid of an area
+						empty_line.append([])
+						empty_font.append(None)
+						empty_rowspan.append(1)
+						empty_colspan.append(1)
+						self.location_map[(i, j)] = (i, tmp_col)
+						tmp_col += 1
 				self.data.append(empty_line)
 				self.font.append(empty_font)
 				self.rowspan.append(empty_rowspan)
