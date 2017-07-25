@@ -17,6 +17,9 @@ def get_PDF_fnames(directory):
 
 # get_PDF_fnames('data/')
 
+# fname_list = ['data/simple1.PDF']
+fname_list = ['data/outline_example_1.pdf']
+
 # fname_list = ['data/table_example_1.pdf', 'data/table_example_2.pdf', 'data/table_example_3.pdf', 'data/table_example_4.pdf', 'data/table_example_5.pdf', 'data/table_example_6.pdf', 'data/table_example_7.pdf', 'data/table_example_8.pdf']
 # fname_list = ['data/table_example_8.pdf']
 # fname_list = ['data/table_example_5.pdf']
@@ -28,7 +31,7 @@ def get_PDF_fnames(directory):
 # fname_list = ['data/2016-03-26-1202083818.PDF']
 # fname_list = ['data/2016-01-19-1201924052.PDF']
 # fname_list = ['data/2016-01-19-1201924054.PDF']
-fname_list = get_PDF_fnames('data/')
+# fname_list = get_PDF_fnames('data/')
 for fname in fname_list:
 	with simplePDF2HTML(fname, get_HTML_fname(fname)) as test:
 		print test.pdf_path

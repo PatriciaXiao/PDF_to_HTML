@@ -111,6 +111,16 @@ class simplePDF2HTML(PDF2HTML):
 		#检查文件是否允许文本提取
 		if not self.document.is_extractable:
 			raise PDFTextExtractionNotAllowed
+		# 试试看能否直接提取目录
+		try:
+			self.outlines = self.document.get_outlines()
+		except Exception, e:
+			self.outlines = None
+			
+		if self.outlines:
+			for (level,title,dest,a,se) in self.outlines:
+				print (level, title, dest, a, se)
+				print title
 		#创建一个PDF资源管理器对象来存储共享资源
 		self.rsrcmgr = PDFResourceManager()
 		#创建一个PDF设备对象
