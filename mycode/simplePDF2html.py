@@ -193,6 +193,26 @@ class simplePDF2HTML(PDF2HTML):
 					table_drawn.append(False)
 					# print tmp_frame.grids
 			# print table_frames
+			# 去除嵌套结构以及页码的外框
+			i = len(table_frames) - 1
+			while i > 0:
+				j = i - 1
+				while j >= 0:
+					# print table_frames[i].grids
+					# print table_frames[j].grids
+					# print table_frames[i].included_in_table(table_frames[j])
+					# print table_frames[j].included_in_table(table_frames[i])
+					if table_frames[i].included_in_table(table_frames[j]):
+						table_frames.pop(j)
+						table_drawn.pop(j)
+						break
+					elif table_frames[j].included_in_table(table_frames[i]):
+						table_frames.pop(i)
+						table_drawn.pop(i)
+						break
+					j -= 1
+				i -= 1
+			# 将属于表格内的内容填进表格内
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)):
 					# in_table.append(-1) # -1 for not included in any table; else: the table frame's index
@@ -243,6 +263,7 @@ class simplePDF2HTML(PDF2HTML):
 			x_idx = -1
 			for x in layout:
 				if(isinstance(x, LTTextBoxHorizontal)): # if(isinstance(x, LTTextLineHorizontal)):
+					# print re.sub(self.replace,'',x.get_text())
 					x_idx += 1
 					if in_table[x_idx] != -1:
 						if not table_drawn[in_table[x_idx]]:
@@ -254,7 +275,7 @@ class simplePDF2HTML(PDF2HTML):
 							prev_text = None
 							#########
 							# haven't drawn yet
-							self.draw_table(table_frames[in_table[x_idx]])
+							self.draw_table(table_frames[in_table[x_idx]], page_xrange)
 							table_drawn[in_table[x_idx]] = True
 						continue
 					fontname, fontsize, location, line_width = self.get_font(x)
@@ -308,10 +329,14 @@ class simplePDF2HTML(PDF2HTML):
 		self.level -= 1
 		self.write('</body>')
 
-	def draw_table(self, table_frame):
+	def draw_table(self, table_frame, page_xrange=None):
 		# data = table_frame.data
 		data, font, rowspan, colspan = table_frame.get_clean_data()
-		self.write('<table border="1" cellspacing="0" align="center">')
+		if page_xrange:
+			width_portion = 100.0 * (table_frame.range['max_x'] - table_frame.range['min_x']) / (page_xrange[1] - page_xrange[0])
+			self.write('<table border="1" cellspacing="0" align="center" width="{0}%">'.format(int(width_portion)))
+		else:
+			self.write('<table border="1" cellspacing="0" align="center">')
 		self.level += 1
 		for i in range(len(data)):
 			self.write('<tr>')
@@ -911,7 +936,7 @@ class TableFrame(object):
 							# connected to the left grid
 							left_connected = True
 
-					print i, j, upper_connected, left_connected
+					# print i, j, upper_connected, left_connected
 
 					# upper_connected = False
 					# left_connected = False
@@ -1026,6 +1051,11 @@ class TableFrame(object):
 		row = location[0]
 		col = location[1]
 		self.data[row][col].append(content)
+
+	def included_in_table(self, another_table):
+		corner1 = (self.range['min_x'], self.range['min_y'])
+		corner2 = (self.range['max_x'], self.range['min_y'])
+		return another_table.is_in_range(corner1) and another_table.is_in_range(corner2)
 
 class Draw(object):
 	def __init__(self, size_x, size_y, offset_x, offset_y):
