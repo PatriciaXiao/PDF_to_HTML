@@ -33,3 +33,9 @@ http://www.open-open.com/lib/view/open1393488232380.html
 https://sourceforge.net/projects/matplotlib/files/
 https://packaging.python.org/tutorials/installing-packages/
 http://www.itkeyword.com/doc/9484478318592984x494/importerror-dll-load-failed-importing-tkinter
+
+Image Convert
+http://blog.csdn.net/royal_coffee/article/details/1602933
+http://www.ai7.org/wp/html/623.html
+http://www.cnblogs.com/yourstars/p/5849881.html
+https://ghostscript.com/download/gsdnld.html
