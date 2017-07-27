@@ -122,13 +122,15 @@ class simplePDF2HTML(PDF2HTML):
 			self.outlines = {}
 			for (level,title,dest,a,se) in raw_outlines:
 				# print level
-				print title
+				# print title
 				# print dest
 				# print dest[0].resolve()
 				# print dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
 				outline_objid = dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
-				print outline_objid
+				self.outlines[outline_objid] = (level, title)
+				# print outline_objid
 			# print self.document._cached_objs
+			# print self.outlines
 		#创建一个PDF资源管理器对象来存储共享资源
 		self.rsrcmgr = PDFResourceManager()
 		#创建一个PDF设备对象
@@ -184,7 +186,15 @@ class simplePDF2HTML(PDF2HTML):
 		prev_length = None
 		for page in PDFPage.create_pages(self.document):
 			# print page
-			print page.resources['ExtGState']['GS0'].objid
+			# print page.resources['ExtGState']['GS0'].objid
+			page_objid = page.resources['ExtGState']['GS0'].objid
+			self.write('<div id="{0}">'.format(page_objid))
+			self.level += 1
+			# print page_objid
+			# if page_objid in self.outlines.keys():
+				# 是一个目录项的对应页
+				# print self.outlines[page_objid]
+			# print self.outlines[page_objid]
 			# print "page " + str(page_idx)
 			self.interpreter.process_page(page)
 			# 接受该页面的LTPage对象
@@ -299,8 +309,8 @@ class simplePDF2HTML(PDF2HTML):
 							table_drawn[in_table[x_idx]] = True
 						continue
 					fontname, fontsize, location, line_width = self.get_font(x)
-					text=re.sub(self.replace,'',x.get_text())
-					# text = x.get_text()
+					# text=re.sub(self.replace,'',x.get_text())
+					text = x.get_text()
 					fontweight = self.fontweight_dict[fontname]
 					actual_left = map_indents[location[0]]
 					indent = self.get_indent(actual_left, major_indents)
@@ -341,6 +351,8 @@ class simplePDF2HTML(PDF2HTML):
 								text, align, fontsize, fontweight
 							))
 			page_idx += 1
+			self.level -= 1
+			self.write('</div>')
 		
 		if prev_text:
 			self.write('<p style="font-size:{2}px;font-weight:{3};text-indent:{4}em;" align="{1}">{0}</p>'.format( \
