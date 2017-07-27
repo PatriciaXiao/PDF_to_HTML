@@ -34,6 +34,7 @@ class PDF2HTML(object):
 		self.indent = '  '
 		self.level = 0
 		self.outlines = None
+		self.outlines_dict = None
 		# http://webdesign.about.com/od/styleproperties/p/blspfontweight.htm
 		self.fontweight_dict = {
 			self.chinese_str('ABCDEE+黑体'): 'bold',
@@ -120,6 +121,7 @@ class simplePDF2HTML(PDF2HTML):
 			
 		if raw_outlines: #pdfpage #pdfdocument #pdftypes
 			self.outlines = {}
+			self.outlines_dict = {}
 			for (level,title,dest,a,se) in raw_outlines:
 				# print level
 				# print title
@@ -128,9 +130,13 @@ class simplePDF2HTML(PDF2HTML):
 				# print dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
 				outline_objid = dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
 				self.outlines[outline_objid] = (level, title)
+				self.outlines_dict[title] = [outline_objid, False]
 				# print outline_objid
 			# print self.document._cached_objs
 			# print self.outlines
+			# for title in self.outlines_dict:
+			# 	print title
+			# 	print self.outlines_dict[title]
 		#创建一个PDF资源管理器对象来存储共享资源
 		self.rsrcmgr = PDFResourceManager()
 		#创建一个PDF设备对象
@@ -289,6 +295,15 @@ class simplePDF2HTML(PDF2HTML):
 					for j in range(len(in_table)):
 						if in_table[j] == i:
 							in_table[j] = -1
+			# 预处理找出目录内容
+			is_outline = []
+			for x in layout:
+				if(isinstance(x, LTTextBoxHorizontal)): # if(isinstance(x, LTTextLineHorizontal)):
+					if self.is_outline_element(x.get_text()):
+						is_outline.append(True)
+					else:
+						is_outline.append(False)
+			print is_outline
 			# 写入表格内容以外的其他内容
 			x_idx = -1
 			for x in layout:
@@ -360,6 +375,21 @@ class simplePDF2HTML(PDF2HTML):
 				))
 		self.level -= 1
 		self.write('</body>')
+
+	def is_outline_element(self, goal_string):
+		if self.outlines:
+			clean_string = re.sub(self.replace,'', goal_string)
+			len_string = len(clean_string)
+			if len(clean_string):
+				for title in self.outlines_dict.keys():
+					if not self.outlines_dict[title][1]:
+						clean_title = re.sub(self.replace,'', title)
+						len_title = len(clean_title)
+						if len_title > len_string: continue
+						if clean_title == clean_string[:len_title]:
+							self.outlines_dict[title][1] = True
+							return True
+		return False
 
 	def draw_table(self, table_frame, page_xrange=None):
 		# data = table_frame.data
