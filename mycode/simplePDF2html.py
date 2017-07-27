@@ -33,6 +33,7 @@ class PDF2HTML(object):
 		self.device = None
 		self.indent = '  '
 		self.level = 0
+		self.outlines = None
 		# http://webdesign.about.com/od/styleproperties/p/blspfontweight.htm
 		self.fontweight_dict = {
 			self.chinese_str('ABCDEE+黑体'): 'bold',
@@ -113,14 +114,21 @@ class simplePDF2HTML(PDF2HTML):
 			raise PDFTextExtractionNotAllowed
 		# 试试看能否直接提取目录
 		try:
-			self.outlines = self.document.get_outlines()
+			raw_outlines = self.document.get_outlines()
 		except Exception, e:
-			self.outlines = None
+			raw_outlines = None
 			
-		if self.outlines:
-			for (level,title,dest,a,se) in self.outlines:
-				print (level, title, dest, a, se)
+		if raw_outlines: #pdfpage #pdfdocument #pdftypes
+			self.outlines = {}
+			for (level,title,dest,a,se) in raw_outlines:
+				# print level
 				print title
+				# print dest
+				# print dest[0].resolve()
+				# print dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
+				outline_objid = dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
+				print outline_objid
+			# print self.document._cached_objs
 		#创建一个PDF资源管理器对象来存储共享资源
 		self.rsrcmgr = PDFResourceManager()
 		#创建一个PDF设备对象
@@ -175,6 +183,8 @@ class simplePDF2HTML(PDF2HTML):
 		prev_align = None
 		prev_length = None
 		for page in PDFPage.create_pages(self.document):
+			# print page
+			print page.resources['ExtGState']['GS0'].objid
 			# print "page " + str(page_idx)
 			self.interpreter.process_page(page)
 			# 接受该页面的LTPage对象
