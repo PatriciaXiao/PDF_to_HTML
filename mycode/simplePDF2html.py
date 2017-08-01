@@ -706,6 +706,8 @@ class simplePDF2HTML(PDF2HTML):
 				else:
 					draw.set_color("red")
 			else:
+				# print x
+				# raw_input()
 				draw.set_color("blue")
 			left = x.x0
 			right = x.x1
@@ -757,7 +759,8 @@ class simplePDF2HTML(PDF2HTML):
 		points_visited = {} # contents: (x, y) : True / False
 		# get the max stroke width
 		for x in layout:
-			if(isinstance(x, LTRect)):
+			# if(isinstance(x, LTRect)):
+			if(isinstance(x, LTRect) or isinstance(x, LTFigure)):
 				left = x.x0
 				right = x.x1
 				top = x.y1
@@ -776,13 +779,16 @@ class simplePDF2HTML(PDF2HTML):
 					# update data
 					if line_stroke > max_stroke:
 						max_stroke = line_stroke
+
 		if max_stroke >= 0:
 			bias = 3 * max_stroke
 		else:
 			bias = 5
+		# print "bias={0}".format(bias)
 		# the raw lines
 		for x in layout:
-			if(isinstance(x, LTRect)):
+			# if(isinstance(x, LTRect)):
+			if(isinstance(x, LTRect) or isinstance(x, LTFigure)):
 				left = x.x0
 				right = x.x1
 				top = x.y1
@@ -910,9 +916,14 @@ class simplePDF2HTML(PDF2HTML):
 		# calculate the points included in a table, and the grids
 		assert len(points_visited.keys()) == len(raw_points.keys()), "points amount and points list length do not match"
 
+		print raw_points
+		print points_visited
+		print raw_points_x
+		print raw_points_y
+
 
 		
-		
+		'''
 		if debug:
 			point_list = raw_points.copy()
 			def debug_walk(tmp_point):
@@ -928,6 +939,9 @@ class simplePDF2HTML(PDF2HTML):
 			test_point = point_list.keys()[0]
 			test_value = point_list[test_point]
 			debug_walk(test_point)
+			print "debug walk done"
+		'''
+		
 
 
 		point_list = raw_points.copy()
@@ -1032,7 +1046,7 @@ class simplePDF2HTML(PDF2HTML):
 
 
 		# test
-		
+		'''
 		if debug:
 			for table in table_list:
 				for pt in table:
@@ -1044,7 +1058,7 @@ class simplePDF2HTML(PDF2HTML):
 				draw.dot(table[n_pts - 1][0], table[n_pts - 1][1], size=10, color_string="red")
 			for line in raw_lines:
 				draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
-			raw_input()
+			# raw_input()
 		
 		if debug:
 			# debug
@@ -1055,6 +1069,8 @@ class simplePDF2HTML(PDF2HTML):
 				draw.set_color("red")
 				print start[0], start[1], end[0], end[1]
 				draw.line(start[0], start[1], end[0], end[1])
+				raw_input()
+		'''
 		
 
 		return table_list, bias, divider_list
