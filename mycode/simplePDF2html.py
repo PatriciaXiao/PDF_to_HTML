@@ -125,13 +125,23 @@ class simplePDF2HTML(PDF2HTML):
 		self.drawn_outline = []
 		self.outline_ids = []
 		if raw_outlines: #pdfpage #pdfdocument #pdftypes
+			print "there are outlines included"
 			for (level,title,dest,a,se) in raw_outlines:
-				# print level
-				# print title
+				'''
+				print level
+				print title
+				raw_input()
+				'''
 				# print dest
 				# print dest[0].resolve()
 				# print dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
-				outline_objid = dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
+				# outline_objid = dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
+				if 'ExtGState' in dest[0].resolve()['Resources']:
+					outline_objid = 0
+					for key in dest[0].resolve()['Resources']['ExtGState'].keys():
+						if key[:2] == 'GS':
+							outline_objid = dest[0].resolve()['Resources']['ExtGState'][key].objid
+							break
 				self.outline_levels.append(level)
 				self.outlines_dict[title] = outline_objid
 				self.outline_titles.append(title)
@@ -142,12 +152,6 @@ class simplePDF2HTML(PDF2HTML):
 				# print dest[0].resolve()['StructParents']
 				# raw_input()
 			# print self.document._cached_objs
-			# print self.outlines
-			# for objid in self.outlines:
-			# 	print objid
-			# 	print self.outlines[objid][0]
-			# 	print self.outlines[objid][1]
-			# raw_input()
 			# for title in self.outlines_dict:
 			# 	print title
 			# 	print self.outlines_dict[title]
@@ -205,9 +209,17 @@ class simplePDF2HTML(PDF2HTML):
 		prev_align = None
 		prev_length = None
 		for page in PDFPage.create_pages(self.document):
+			print "processing page {0}".format(page_idx)
 			# print page
+			# print page.resources
 			# print page.resources['ExtGState']['GS0'].objid
-			page_objid = page.resources['ExtGState']['GS0'].objid
+			page_objid = 0
+			if 'ExtGState' in page.resources: # and 'GS0' in page.resources['ExtGState']:
+				page_objid = 0
+				for key in page.resources['ExtGState'].keys():
+					if key[:2] == 'GS':
+						page_objid = page.resources['ExtGState'][key].objid
+						break
 			self.write('<div id="{0}">'.format(page_objid))
 			self.level += 1
 			# print page_objid
