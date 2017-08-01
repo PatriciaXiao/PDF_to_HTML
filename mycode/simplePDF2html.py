@@ -118,8 +118,8 @@ class simplePDF2HTML(PDF2HTML):
 			raw_outlines = self.document.get_outlines()
 		except Exception, e:
 			raw_outlines = None
-		
-		self.outlines = {}
+
+		self.outline_levels = []
 		self.outlines_dict = {}
 		self.outline_titles = []
 		self.drawn_outline = []
@@ -132,14 +132,22 @@ class simplePDF2HTML(PDF2HTML):
 				# print dest[0].resolve()
 				# print dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
 				outline_objid = dest[0].resolve()['Resources']['ExtGState']['GS0'].objid
-				self.outlines[outline_objid] = (level, title)
+				self.outline_levels.append(level)
 				self.outlines_dict[title] = outline_objid
 				self.outline_titles.append(title)
 				self.drawn_outline.append(False)
 				self.outline_ids.append(outline_objid)
 				# print outline_objid
+				# print dest[0].resolve()['Parent']
+				# print dest[0].resolve()['StructParents']
+				# raw_input()
 			# print self.document._cached_objs
 			# print self.outlines
+			# for objid in self.outlines:
+			# 	print objid
+			# 	print self.outlines[objid][0]
+			# 	print self.outlines[objid][1]
+			# raw_input()
 			# for title in self.outlines_dict:
 			# 	print title
 			# 	print self.outlines_dict[title]
@@ -350,13 +358,14 @@ class simplePDF2HTML(PDF2HTML):
 					is_real_outline_content = True
 				if not is_real_outline_content:
 					in_outline[i] = -1
-
-			# print in_outline
+			'''
+			print in_outline
 			# raw_input()
-			# for key in outline_content:
-			# 	print key
-			# 	print re.sub(self.replace,'',outline_content[key])
-			# raw_input()
+			for key in outline_content:
+				print key
+				print re.sub(self.replace,'',outline_content[key])
+			raw_input()
+			'''
 			# 写入表格内容以外的其他内容
 			x_idx = -1
 			for x in layout:
@@ -447,7 +456,16 @@ class simplePDF2HTML(PDF2HTML):
 
 	def draw_outline(self, outline_idx, outline_title, font_size, font_weight):
 		ref_id = self.outline_ids[outline_idx]
-		level = self.outlines[ref_id][0]
+		level = self.outline_levels[outline_idx]
+		'''
+		print outline_title
+		print outline_idx
+		print ref_id
+		print level
+		print self.outline_titles[outline_idx]
+		print self.outlines[ref_id][1]
+		raw_input()
+		'''
 		if level > 0:
 			indent = (level - 1) * 2.0
 		else:
@@ -479,25 +497,6 @@ class simplePDF2HTML(PDF2HTML):
 				goal_idx = i
 				break
 		return goal_idx
-
-	'''
-	def is_outline_element(self, goal_string):
-		found = False
-		if self.outlines:
-			clean_string = re.sub(self.replace,'', goal_string)
-			len_string = len(clean_string)
-			if len(clean_string):
-				for title in self.outlines_dict.keys():
-					if not self.outlines_dict[title][1]:
-						clean_title = re.sub(self.replace,'', title)
-						len_title = len(clean_title)
-						if len_title > len_string: continue
-						if clean_title == clean_string[:len_title]:
-							self.outlines_dict[title][1] = True
-							found = True
-							break
-		return found
-	'''
 
 	def draw_table(self, table_frame, page_xrange=None):
 		# data = table_frame.data
