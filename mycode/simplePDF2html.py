@@ -1142,9 +1142,12 @@ class simplePDF2HTML(PDF2HTML):
 			for line in tmp_lines:
 				pt1 = min(line[0], line[1])
 				pt2 = max(line[0], line[1])
-				if 650 in [pt1[1], pt2[1], pt1[0], pt2[0]] and 670 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
+				# if 91.5 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
+				if 346 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
 					print line
-			'''
+			# '''
+			# print x_lines
+			# print y_lines
 			###
 			# 处理分割线
 			for line in tmp_lines:
@@ -1176,6 +1179,11 @@ class simplePDF2HTML(PDF2HTML):
 						elif tmp_xs[idx] == pt2[0]:
 							end_line_idx = idx
 							break # because it was sorted
+					'''
+					print pt1[0], pt2[0]
+					print tmp_xs
+					print len(tmp_xs), len(tmp_ys)
+					#####'''
 					assert start_line_idx != -1 and end_line_idx != -1, "error happend when building the frame of the table"
 					for idx in range(start_line_idx, end_line_idx):
 						tmp_pt1 = (tmp_xs[idx], pt1[1])
@@ -1320,7 +1328,7 @@ class TableFrame(object):
 						print representer_j
 						print i, j, tmp_col
 						print empty_colspan
-						'''
+						# '''
 						empty_colspan[representer_j] += 1
 
 					else: # the starting grid of an area
@@ -1337,8 +1345,8 @@ class TableFrame(object):
 				self.font.append(empty_font)
 				self.rowspan.append(empty_rowspan)
 				self.colspan.append(empty_colspan)
-			print self.rowspan
-			print self.colspan
+			# print self.rowspan
+			# print self.colspan
 			corner1 = table_points_list[0]
 			corner2 = table_points_list[len(table_points_list) - 1]
 			self.range['max_x'] = max(corner1[0], corner2[0])
