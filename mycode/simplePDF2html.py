@@ -736,7 +736,7 @@ class simplePDF2HTML(PDF2HTML):
 	
 
 	def get_tables(self, layout):
-		debug = True
+		debug = False #True
 		if debug:
 			page_range = {
 				"left": layout.x0,
@@ -1001,6 +1001,17 @@ class simplePDF2HTML(PDF2HTML):
 					break
 		# print table_line_list
 
+		def line_merge(range1, range2):
+			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
+			r1_min = min(range1)
+			r1_max = max(range1)
+			r2_min = min(range2)
+			r2_max = max(range2)
+			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0:
+				merged_range = [[min(r1_min, r2_min), max(r1_max, r2_max)]]
+			else:
+				merged_range = [range1, range2]
+			return merged_range
 		# get the regularized lines
 		for i in range(len(table_list)):
 			tmp_xs = []
@@ -1019,6 +1030,123 @@ class simplePDF2HTML(PDF2HTML):
 			tmp_ys.sort()
 			# print tmp_xs
 			# print tmp_ys
+			# 规范一下xs和ys从而避免一个线段被分成两个的状况
+			len_xs = len(tmp_xs)
+			len_ys = len(tmp_ys)
+			if len_xs < 2 or len_ys < 2:
+				continue
+			keep_xs = {}
+			keep_ys = {}
+			x_lines = {} # x: [[y1, y2], [y1', y2']...], same x, vertical
+			y_lines = {} # y: [[x1, x2], [x1', x2']...], same y, horizontal
+			for tmp_x in tmp_xs[1: len_xs - 1]:
+				keep_xs[tmp_x] = False
+			for tmp_y in tmp_ys[1: len_ys - 1]:
+				keep_ys[tmp_y] = False
+			keep_xs[tmp_xs[0]] = True
+			keep_ys[tmp_ys[0]] = True
+			keep_xs[tmp_xs[len_xs - 1]] = True
+			keep_ys[tmp_ys[len_ys - 1]] = True
+			for line in tmp_lines:
+				# 找出合法的点
+				pt1 = min(line[0], line[1])
+				pt2 = max(line[0], line[1])
+				if pt1[0] == pt2[0]:
+					# print "same x"
+					tmp_x = pt1[0]
+					tmp_y = [pt1[1], pt2[1]]
+					keep_xs[tmp_x] = True
+					if tmp_x in x_lines.keys():
+						# merge
+						# prev_tmp_y = copy.copy(tmp_y)
+						n_tmp_col_lines = len(x_lines[tmp_x])
+						for c in range(n_tmp_col_lines):
+							tmp_idx = n_tmp_col_lines - 1 - c
+							merged_line = line_merge(x_lines[tmp_x][tmp_idx], tmp_y)
+							if len(merged_line) == 1:
+								x_lines[tmp_x].pop(tmp_idx)
+								tmp_y[0] = merged_line[0][0]
+								tmp_y[1] = merged_line[0][1]
+						x_lines[tmp_x].append(tmp_y)
+						'''
+						if prev_tmp_y[0] != tmp_y[0] or prev_tmp_y[1] != tmp_y[1]:
+							print "changed!"
+							print prev_tmp_y[0], tmp_y[0], prev_tmp_y[1], tmp_y[1]
+							raw_input()
+						# '''
+					else:
+						x_lines[tmp_x] = [tmp_y]
+				elif pt1[1] == pt2[1]: 
+					# print "same y"
+					tmp_y = pt1[1]
+					tmp_x = [pt1[0], pt2[0]]
+					keep_ys[tmp_y] = True
+					if tmp_y in y_lines.keys():
+						# merge
+						n_tmp_row_lines = len(y_lines[tmp_y])
+						for r in range(n_tmp_row_lines):
+							tmp_idx = n_tmp_row_lines - 1 - r
+							merged_line = line_merge(y_lines[tmp_y][tmp_idx], tmp_x)
+							if len(merged_line) == 1:
+								y_lines[tmp_y].pop(tmp_idx)
+								tmp_x[0] = merged_line[0][0]
+								tmp_x[1] = merged_line[0][1]
+						y_lines[tmp_y].append(tmp_x)
+						# print y_lines[tmp_y]
+					else:
+						y_lines[tmp_y] = [tmp_x]
+				'''
+				print x_lines
+				print y_lines
+				print "***********"
+				raw_input()
+				# '''
+			tmp_xs = [k for k in keep_xs.keys() if keep_xs[k]]
+			tmp_ys = [k for k in keep_ys.keys() if keep_ys[k]]
+			tmp_xs.sort()
+			tmp_ys.sort()
+			# table list update!
+			j = len(tmp_table) - 1
+			while j >= 0:
+				if tmp_table[j][0] not in tmp_xs or tmp_table[j][1] not in tmp_ys:
+					table_list[i].pop(j)
+				j -= 1
+			# line update
+			tmp_lines = []
+			'''
+			print x_lines
+			print y_lines
+			raw_input()
+			'''
+			for x_line_key in x_lines.keys():
+				###
+				'''
+				x_lines[x_line_key].sort()
+				print x_lines[x_line_key]
+				raw_input()
+				# '''
+				###
+				for x_line in x_lines[x_line_key]:
+					pt1 = (x_line_key, x_line[0])
+					pt2 = (x_line_key, x_line[1])
+					tmp_lines.append((pt1, pt2))
+			for y_line_key in y_lines.keys():
+				for y_line in y_lines[y_line_key]:
+					pt1 = (y_line[0], y_line_key)
+					pt2 = (y_line[1], y_line_key)
+					tmp_lines.append((pt1, pt2))
+			###
+			'''
+			print tmp_xs
+			print tmp_ys
+			for line in tmp_lines:
+				pt1 = min(line[0], line[1])
+				pt2 = max(line[0], line[1])
+				if 650 in [pt1[1], pt2[1], pt1[0], pt2[0]] and 670 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
+					print line
+			'''
+			###
+			# 处理分割线
 			for line in tmp_lines:
 				pt1 = min(line[0], line[1])
 				pt2 = max(line[0], line[1])
@@ -1060,7 +1188,7 @@ class simplePDF2HTML(PDF2HTML):
 
 
 		# test
-		'''
+		
 		if debug:
 			for table in table_list:
 				for pt in table:
@@ -1072,9 +1200,9 @@ class simplePDF2HTML(PDF2HTML):
 				draw.dot(table[n_pts - 1][0], table[n_pts - 1][1], size=10, color_string="red")
 			for line in raw_lines:
 				draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
-			# raw_input()
-		'''
+			raw_input()
 		
+		'''
 		if debug:
 			# debug
 			for lst in divider_list:
@@ -1086,11 +1214,11 @@ class simplePDF2HTML(PDF2HTML):
 					draw.set_color("red")
 					# print start[0], start[1], end[0], end[1]
 					draw.line(start[0], start[1], end[0], end[1])
+		'''
 			
 
 		if debug:
 			raw_input()
-		
 
 		return table_list, bias, divider_list
 
@@ -1162,6 +1290,15 @@ class TableFrame(object):
 					# upper_connected = False
 					# left_connected = False
 					# print "point({2},{3}) upper_connected={0}, left_connected={1}".format(upper_connected, left_connected, i, j)
+					'''if i == 2 and j == 1:
+						print upper_connected
+						print (upperleft_corner, upperright_corner)
+						print (upperright_corner, upperleft_corner)
+						table_divider_list.sort()
+						print table_divider_list
+						print n_cols, n_rows
+						print self.grids['y']
+						'''
 
 					if upper_connected and left_connected:
 						self.location_map[(i, j)] = self.location_map[(i - 1, j)]
@@ -1200,6 +1337,8 @@ class TableFrame(object):
 				self.font.append(empty_font)
 				self.rowspan.append(empty_rowspan)
 				self.colspan.append(empty_colspan)
+			print self.rowspan
+			print self.colspan
 			corner1 = table_points_list[0]
 			corner2 = table_points_list[len(table_points_list) - 1]
 			self.range['max_x'] = max(corner1[0], corner2[0])
