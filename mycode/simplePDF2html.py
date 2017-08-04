@@ -752,15 +752,15 @@ class simplePDF2HTML(PDF2HTML):
 			draw = Draw(size_x, size_y, offset_x, offset_y)
 			draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		# get the maximum value of the line stroke width
-		def line_merge(range1, range2):
+		def line_merge(range1, range2, bias=0):
 			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
-			r1_min = min(range1)
-			r1_max = max(range1)
-			r2_min = min(range2)
-			r2_max = max(range2)
+			r1_min = min(range1) - bias
+			r1_max = max(range1) + bias
+			r2_min = min(range2) - bias
+			r2_max = max(range2) + bias
 			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0\
 			  or (r2_min - r1_min)*(r2_min - r1_max) <=0 or (r2_max - r1_min)*(r2_max - r1_max) <=0:
-				merged_range = [[min(r1_min, r2_min), max(r1_max, r2_max)]]
+				merged_range = [[min(r1_min, r2_min) + bias, max(r1_max, r2_max) - bias]]
 			else:
 				merged_range = [range1, range2]
 			return merged_range
@@ -772,6 +772,8 @@ class simplePDF2HTML(PDF2HTML):
 		
 		table_outline_elem_lst = [] # contents: {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'isLine': isLine}
 		table_raw_dash_lst = []
+		dashline_parser_xs = []
+		dashline_parser_ys = []
 		# get the max stroke width
 		for x in layout:
 			# if(isinstance(x, LTRect)):
@@ -789,8 +791,22 @@ class simplePDF2HTML(PDF2HTML):
 					# fetch data
 					if isLine == 'x':
 						line_stroke = top - bottom
+						shared_y = (top + bottom) / 2.0
+						if shared_y not in dashline_parser_ys:
+							dashline_parser_ys.append(shared_y)
+						if left not in dashline_parser_xs:
+							dashline_parser_xs.append(left)
+						if right not in dashline_parser_xs:
+							dashline_parser_xs.append(right)
 					elif isLine =='y':
 						line_stroke = right - left
+						shared_x = (left + right) / 2.0
+						if shared_x not in dashline_parser_xs:
+							dashline_parser_xs.append(shared_x)
+						if top not in dashline_parser_ys:
+							dashline_parser_ys.append(top)
+						if bottom not in dashline_parser_ys:
+							dashline_parser_ys.append(bottom)
 					elif isLine == 'point':
 						line_stroke = min(top - bottom, right - left)
 					# update data
@@ -810,13 +826,184 @@ class simplePDF2HTML(PDF2HTML):
 						table_outline_elem_lst.append(tmp_elem)
 
 		if max_stroke >= 0:
-			bias = 3 * max_stroke # 3 # 1.5 # 1
+			bias = 3 * max_stroke 
 		else:
-			bias = 5 # 5 # 2.5 # 1
+			bias = 5 
 		# 处理一下 table_outline_elem_lst:
 		# print len(table_raw_dash_lst)
 		# print len(table_outline_elem_lst)
-		# 首先分出不同表格的子区域
+
+		# 首先把虚线找出来连起来
+		# print len(table_raw_dash_lst)
+		raw_dashline_dot_xs = {} #(x1, x2): [idx1, idx2, ...]
+		raw_dashline_dot_ys = {} #(y1, y2): [idx1, idx2, ...]
+		
+		for i in range(len(table_raw_dash_lst)):
+			raw_dashline_dots = table_raw_dash_lst[i]
+			left = raw_dashline_dots['x0']
+			right = raw_dashline_dots['x1']
+			top = raw_dashline_dots['y1']
+			bottom = raw_dashline_dots['y0']
+			# draw.square(left, right, top, bottom)
+			dot_x_key = (left, right)
+			dot_y_key = (bottom, top)
+			if dot_x_key in raw_dashline_dot_xs.keys():
+				raw_dashline_dot_xs[dot_x_key].append([bottom, top])
+			else:
+				raw_dashline_dot_xs[dot_x_key]= [[bottom, top]]
+			if dot_y_key in raw_dashline_dot_ys.keys():
+				raw_dashline_dot_ys[dot_y_key].append([left, right])
+			else:
+				raw_dashline_dot_ys[dot_y_key]= [[left, right]]
+		# lines merged
+		table_dashlines = [] # contents: element
+		for dot_x_key in raw_dashline_dot_xs.keys(): # vertical lines
+			# 针对每一个 x 线段，找这个坐标上能连起来的y线段；因为预先排序，所以只需要看前一个就行
+			candidate_ys = raw_dashline_dot_xs[dot_x_key]
+			candidate_ys.sort()
+			first_line = [candidate_ys[0][0], candidate_ys[0][1]]
+			lines_y_list = [first_line]
+			for dot_y in candidate_ys[1:]:
+				last_y_idx = len(lines_y_list) - 1
+				last_line = lines_y_list[last_y_idx]
+				# print line_merge(last_line, dot_y, bias=bias)
+				merged_result = line_merge(last_line, dot_y, bias=bias)
+				if len(merged_result) == 1:
+					# successfully merged
+					lines_y_list[last_y_idx][0] = merged_result[0][0]
+					lines_y_list[last_y_idx][1] = merged_result[0][1]
+				else:
+					lines_y_list.append([dot_y[0], dot_y[1]])
+			# raw_input("******ended dot {0}*********".format(dot_x_key))
+			left = min(dot_x_key[0],dot_x_key[1])
+			right = max(dot_x_key[0],dot_x_key[1])
+			for line_y in lines_y_list:
+				bottom = min(line_y[1], line_y[0])
+				top = max(line_y[1], line_y[0])
+
+				if top - bottom > 2 * bias:
+					tmp_elem = {
+								'x0': left, 
+								'x1': right, 
+								'y0': bottom, 
+								'y1': top, 
+								'isLine': 'y'
+							}
+					table_dashlines.append(tmp_elem)
+			# if dot_x_key[0] == dot_x_key[1]:
+				# print dot_x_key
+		# print table_dashlines
+		# print raw_dashline_dot_ys
+		for dot_y_key in raw_dashline_dot_ys.keys():
+			candidate_xs = raw_dashline_dot_ys[dot_y_key]
+			candidate_xs.sort()
+			first_line = [candidate_xs[0][0], candidate_xs[0][1]]
+			lines_x_list = [first_line]
+			for dot_x in candidate_xs[1:]:
+				last_x_idx = len(lines_x_list) - 1
+				last_line = lines_x_list[last_x_idx]
+				merged_result = line_merge(last_line, dot_x, bias=bias)
+				if len(merged_result) == 1:
+					lines_x_list[last_x_idx][0] = merged_result[0][0]
+					lines_x_list[last_x_idx][1] = merged_result[0][1]
+				else:
+					lines_x_list.append([dot_x[0], dot_x[1]])
+			top = max(dot_y_key[0], dot_y_key[1])
+			bottom = min(dot_y_key[0], dot_y_key[1])
+			for line_x in lines_x_list:
+				left = min(line_x[0], line_x[1])
+				right = max(line_x[0], line_x[1])
+				if right - left > 2 * bias:
+					tmp_elem = {
+								'x0': left, 
+								'x1': right, 
+								'y0': bottom, 
+								'y1': top, 
+								'isLine': 'x'
+							}
+					table_dashlines.append(tmp_elem)
+		'''
+		if debug:
+			print table_dashlines
+			for dashline in table_dashlines:
+				left = dashline['x0']
+				right = dashline['x1']
+				top = dashline['y1']
+				bottom = dashline['y0']
+				draw.square(left, right, top, bottom)
+		'''
+		# 将table_dashlines整理出交点来
+		for dashline_x in table_dashlines:
+			if dashline_x['isLine'] == 'x':
+				if dashline_x['x0'] not in dashline_parser_xs:
+					dashline_parser_xs.append(dashline_x['x0'])
+				if dashline_x['x1'] not in dashline_parser_xs:
+					dashline_parser_xs.append(dashline_x['x1'])
+				for dashline_y in table_dashlines:
+					if dashline_y['isLine'] == 'y':
+						if dashline_y['y0'] not in dashline_parser_ys:
+							dashline_parser_ys.append(dashline_y['y0'])
+						if dashline_y['y1'] not in dashline_parser_ys:
+							dashline_parser_ys.append(dashline_y['y1'])
+						merged_x = line_merge([dashline_x['x0'], dashline_x['x1']], [dashline_y['x0'], dashline_y['x1']], bias=bias)
+						merged_y = line_merge([dashline_x['y0'], dashline_x['y1']], [dashline_y['y0'], dashline_y['y1']], bias=bias)
+						if len(merged_x) == 1 and len(merged_y) == 1:
+							parser_x = (dashline_y['x1'] + dashline_y['x0']) / 2.0
+							parser_y = (dashline_x['y1'] + dashline_x['y0']) / 2.0
+							if parser_x not in dashline_parser_xs:
+								dashline_parser_xs.append(parser_x)
+							if parser_y not in dashline_parser_ys:
+								dashline_parser_ys.append(parser_y)
+		dashline_parser_xs.sort()
+		dashline_parser_ys.sort()
+		# print dashline_parser_xs
+		# print dashline_parser_ys
+		for dashline in table_dashlines:
+			if dashline['isLine'] == 'x':
+				# horizontal
+				start_val = min(dashline['x0'], dashline['x1'])
+				end_val = max(dashline['x0'], dashline['x1'])
+				start_idx = -1
+				end_idx = -1
+				for i in range(len(dashline_parser_xs)):
+					if dashline_parser_xs[i] == start_val:
+						start_idx = i
+					if dashline_parser_xs[i] == end_val:
+						end_idx = i
+						break
+				assert start_idx != -1 and end_idx != -1 and start_idx < end_idx
+				for i in range(start_idx, end_idx):
+					table_outline_elem_lst.append({
+							'x0': dashline_parser_xs[i], 
+							'x1': dashline_parser_xs[i + 1], 
+							'y0': dashline['y0'], 
+							'y1': dashline['y1'],
+							'isLine': 'x'
+						})
+			elif dashline['isLine'] == 'y':
+				# horizontal
+				start_val = min(dashline['y0'], dashline['y1'])
+				end_val = max(dashline['y0'], dashline['y1'])
+				start_idx = -1
+				end_idx = -1
+				for i in range(len(dashline_parser_ys)):
+					if dashline_parser_ys[i] == start_val:
+						start_idx = i
+					if dashline_parser_ys[i] == end_val:
+						end_idx = i
+						break
+				assert start_idx != -1 and end_idx != -1 and start_idx < end_idx
+				for i in range(start_idx, end_idx):
+					table_outline_elem_lst.append({
+							'x0': dashline['x0'],  
+							'x1': dashline['x1'], 
+							'y0': dashline_parser_ys[i],
+							'y1': dashline_parser_ys[i + 1],
+							'isLine': 'y'
+						})
+
+
+		# 分出不同表格的子区域
 		clean_tables_area = [] # 每个表占的x, y范围, 内容: [[x1, x2], [y1, y2]]
 
 		for outline_elem in table_outline_elem_lst:
