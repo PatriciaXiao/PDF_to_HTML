@@ -810,9 +810,9 @@ class simplePDF2HTML(PDF2HTML):
 						table_outline_elem_lst.append(tmp_elem)
 
 		if max_stroke >= 0:
-			bias = 1 * max_stroke # 3 # 1.5 # 1
+			bias = 3 * max_stroke # 3 # 1.5 # 1
 		else:
-			bias = 1 # 5 # 2.5 # 1
+			bias = 5 # 5 # 2.5 # 1
 		# 处理一下 table_outline_elem_lst:
 		# print len(table_raw_dash_lst)
 		# print len(table_outline_elem_lst)
@@ -837,7 +837,7 @@ class simplePDF2HTML(PDF2HTML):
 					clean_tables_area.pop(i)
 				i -= 1
 			clean_tables_area.append([tmp_x_range, tmp_y_range])
-		print clean_tables_area
+		# print clean_tables_area
 		clean_tables_lst = [] # grouped outline elements, contents: [elem1, elem2, ...]
 		for elem in clean_tables_area:
 			clean_tables_lst.append([])
