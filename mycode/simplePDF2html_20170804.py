@@ -737,7 +737,6 @@ class simplePDF2HTML(PDF2HTML):
 
 	def get_tables(self, layout):
 		debug = False #True
-		# 在debug状态画出页码的边框
 		if debug:
 			page_range = {
 				"left": layout.x0,
@@ -752,24 +751,12 @@ class simplePDF2HTML(PDF2HTML):
 			draw = Draw(size_x, size_y, offset_x, offset_y)
 			draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
 		# get the maximum value of the line stroke width
-		def line_merge(range1, range2):
-			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
-			r1_min = min(range1)
-			r1_max = max(range1)
-			r2_min = min(range2)
-			r2_max = max(range2)
-			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0\
-			  or (r2_min - r1_min)*(r2_min - r1_max) <=0 or (r2_max - r1_min)*(r2_max - r1_max) <=0:
-				merged_range = [[min(r1_min, r2_min), max(r1_max, r2_max)]]
-			else:
-				merged_range = [range1, range2]
-			return merged_range
 		max_stroke = -1
 		raw_lines = [] # contents: ((x1, y1), (x2, y2))
 		raw_points = {} # contents: (x, y): [idx1, idx2, ...] - the index of corresponding lines
+		raw_points_x = [] # contents: x
+		raw_points_y = [] # contents: y
 		points_visited = {} # contents: (x, y) : True / False
-
-		
 		table_outline_elem_lst = [] # contents: {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'isLine': isLine}
 		table_raw_dash_lst = []
 		# get the max stroke width
@@ -797,187 +784,151 @@ class simplePDF2HTML(PDF2HTML):
 					if line_stroke > max_stroke:
 						max_stroke = line_stroke
 				if isLine:
-					tmp_elem = {
+					if isLine == 'point':
+						table_raw_dash_lst.append({
 								'x0': left, 
 								'x1': right, 
 								'y0': bottom, 
 								'y1': top, 
 								'isLine': isLine
-							}
-					if isLine == 'point':
-						table_raw_dash_lst.append(tmp_elem)
+							})
 					else:
-						table_outline_elem_lst.append(tmp_elem)
+						table_outline_elem_lst.append({
+								'x0': left, 
+								'x1': right, 
+								'y0': bottom, 
+								'y1': top, 
+								'isLine': isLine
+							})
 
 		if max_stroke >= 0:
-			bias = 1 * max_stroke # 3 # 1.5 # 1
+			bias = 1 * max_stroke # 3 # 1.5
 		else:
-			bias = 1 # 5 # 2.5 # 1
+			bias = 1 # 5 # 2.5
 		# 处理一下 table_outline_elem_lst:
 		# print len(table_raw_dash_lst)
 		# print len(table_outline_elem_lst)
-		# 首先分出不同表格的子区域
-		clean_tables_area = [] # 每个表占的x, y范围, 内容: [[x1, x2], [y1, y2]]
-
-		for outline_elem in table_outline_elem_lst:
-			tmp_x_range = [outline_elem['x0'], outline_elem['x1']]
-			tmp_y_range = [outline_elem['y1'], outline_elem['y0']]
-			i = len(clean_tables_area) - 1
-			while i >= 0:
-				new_x_range = line_merge(clean_tables_area[i][0], tmp_x_range)
-				new_y_range = line_merge(clean_tables_area[i][1], tmp_y_range)
-				# print clean_tables_area[i][0], tmp_x_range, new_x_range
-				# print clean_tables_area[i][1], tmp_y_range, new_y_range
-				if len(new_x_range) == 1 and len(new_y_range) == 1:
-					# successfully merged
-					tmp_x_range[0] = new_x_range[0][0]
-					tmp_x_range[1] = new_x_range[0][1]
-					tmp_y_range[0] = new_y_range[0][0]
-					tmp_y_range[1] = new_y_range[0][1]
-					clean_tables_area.pop(i)
-				i -= 1
-			clean_tables_area.append([tmp_x_range, tmp_y_range])
-		print clean_tables_area
-		clean_tables_lst = [] # grouped outline elements, contents: [elem1, elem2, ...]
-		for elem in clean_tables_area:
-			clean_tables_lst.append([])
-		for outline_elem in table_outline_elem_lst:
-			tmp_x_range = [outline_elem['x0'], outline_elem['x1']]
-			tmp_y_range = [outline_elem['y1'], outline_elem['y0']]
-			tmp_table_idx = -1
-			for i in range(len(clean_tables_area)):
-				new_x_range = line_merge(clean_tables_area[i][0], tmp_x_range)
-				new_y_range = line_merge(clean_tables_area[i][1], tmp_y_range)
-				if len(new_x_range) == 1 and len(new_y_range) == 1:
-					tmp_table_idx = i
-					break
-			# print tmp_table_idx
-			if tmp_table_idx >= 0:
-				clean_tables_lst[tmp_table_idx].append(outline_elem.copy())
-		# 然后规范一下坐标值
+		# 首先规范一下坐标值
 		# 开始整理表格内容
-		for clean_tables_lst_elem in clean_tables_lst:
-			raw_points_x = [] # contents: x
-			raw_points_y = [] # contents: y
-			for outline_elem in clean_tables_lst_elem:
-				left = outline_elem['x0']
-				right = outline_elem['x1']
-				top = outline_elem['y1']
-				bottom = outline_elem['y0']
-				idx_left = self.get_closest_idx(left, raw_points_x, bias)
-				idx_right = self.get_closest_idx(right, raw_points_x, bias)
-				idx_top = self.get_closest_idx(top, raw_points_y, bias)
-				idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
-				if idx_left >= 0:
-					left = raw_points_x[idx_left]
-				if idx_right >= 0:
-					right = raw_points_x[idx_right]
-				if idx_top >= 0:
-					top = raw_points_y[idx_top]
-				if idx_bottom >= 0:
-					bottom = raw_points_y[idx_bottom]
+		for outline_elem in table_outline_elem_lst:
+			left = outline_elem['x0']
+			right = outline_elem['x1']
+			top = outline_elem['y1']
+			bottom = outline_elem['y0']
+			idx_left = self.get_closest_idx(left, raw_points_x, bias)
+			idx_right = self.get_closest_idx(right, raw_points_x, bias)
+			idx_top = self.get_closest_idx(top, raw_points_y, bias)
+			idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
+			if idx_left >= 0:
+				left = raw_points_x[idx_left]
+			if idx_right >= 0:
+				right = raw_points_x[idx_right]
+			if idx_top >= 0:
+				top = raw_points_y[idx_top]
+			if idx_bottom >= 0:
+				bottom = raw_points_y[idx_bottom]
 
 
-				isLine = outline_elem['isLine']
-				if isLine: # a line
-					# fetch data
-					if isLine == 'x':
-						# print 'x'
-						if idx_left == -1:
-							raw_points_x.append(left)
-						idx_right = self.get_closest_idx(right, raw_points_x, bias)
-						if idx_right == -1:
-							raw_points_x.append(right)
-						fixed_y = (top + bottom) / 2.0
-						fixed_y = int(fixed_y)
-						idx_fixed_y = self.get_closest_idx(fixed_y, raw_points_y, bias)
-						if idx_fixed_y >= 0:
-							fixed_y = raw_points_y[idx_fixed_y]
-						else:
-							raw_points_y.append(fixed_y)
-						
-						pt1 = (left, fixed_y)
-						pt2 = (right, fixed_y)
-					elif isLine =='y':
-						# print 'y'
-						if idx_top == -1:
-							raw_points_y.append(top)
-						idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
-						if idx_bottom == -1:
-							raw_points_y.append(bottom)
-						fixed_x = (left + right) / 2.0
-						fixed_y = int(fixed_x)
-						idx_fixed_x = self.get_closest_idx(fixed_x, raw_points_x, bias)
-						if idx_fixed_x >= 0:
-							fixed_x = raw_points_x[idx_fixed_x]
-						else:
-							raw_points_x.append(fixed_x)
-						
-						pt1 = (fixed_x, top)
-						pt2 = (fixed_x, bottom)
-					# update data
-					if pt1 not in raw_points.keys():
-						raw_points[pt1] = []
-						points_visited[pt1] = False
-					if pt2 not in raw_points.keys():
-						raw_points[pt2] = []
-						points_visited[pt2] = False
-					tmp_idx_line = len(raw_lines)
-					if (pt1, pt2) not in raw_lines and (pt2, pt1) not in raw_lines:
-						raw_lines.append( (pt1, pt2) )
-						raw_points[pt1].append(tmp_idx_line)
-						raw_points[pt2].append(tmp_idx_line)
-				else: # a rectangle
+			isLine = outline_elem['isLine']
+			if isLine: # a line
+				# fetch data
+				if isLine == 'x':
+					# print 'x'
 					if idx_left == -1:
 						raw_points_x.append(left)
 					idx_right = self.get_closest_idx(right, raw_points_x, bias)
 					if idx_right == -1:
 						raw_points_x.append(right)
+					fixed_y = (top + bottom) / 2.0
+					fixed_y = int(fixed_y)
+					idx_fixed_y = self.get_closest_idx(fixed_y, raw_points_y, bias)
+					if idx_fixed_y >= 0:
+						fixed_y = raw_points_y[idx_fixed_y]
+					else:
+						raw_points_y.append(fixed_y)
+					
+					pt1 = (left, fixed_y)
+					pt2 = (right, fixed_y)
+				elif isLine =='y':
+					# print 'y'
 					if idx_top == -1:
 						raw_points_y.append(top)
 					idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
 					if idx_bottom == -1:
 						raw_points_y.append(bottom)
-					pt1 = (left, top)
-					pt2 = (right, top)
-					pt3 = (right, bottom)
-					pt4 = (left, bottom)
+					fixed_x = (left + right) / 2.0
+					fixed_y = int(fixed_x)
+					idx_fixed_x = self.get_closest_idx(fixed_x, raw_points_x, bias)
+					if idx_fixed_x >= 0:
+						fixed_x = raw_points_x[idx_fixed_x]
+					else:
+						raw_points_x.append(fixed_x)
+					
+					pt1 = (fixed_x, top)
+					pt2 = (fixed_x, bottom)
+				# update data
+				if pt1 not in raw_points.keys():
+					raw_points[pt1] = []
 					points_visited[pt1] = False
+				if pt2 not in raw_points.keys():
+					raw_points[pt2] = []
 					points_visited[pt2] = False
-					points_visited[pt3] = False
-					points_visited[pt4] = False
-					if pt1 not in raw_points:
-						raw_points[pt1] = []
-					if pt2 not in raw_points:
-						raw_points[pt2] = []
-					if pt3 not in raw_points:
-						raw_points[pt3] = []
-					if pt4 not in raw_points:
-						raw_points[pt4] = []
-					# raw_lines.append( (pt1, pt2) )
-					tmp_idx_line = len(raw_lines)
-					if (pt1, pt2) not in raw_lines and (pt2, pt1) not in raw_lines:
-						raw_lines.append( (pt1, pt2) )
-						raw_points[pt1].append(tmp_idx_line)
-						raw_points[pt2].append(tmp_idx_line)
-					# raw_lines.append( (pt2, pt3) )
-					tmp_idx_line = len(raw_lines)
-					if (pt2, pt3) not in raw_lines and (pt3, pt2) not in raw_lines:
-						raw_lines.append( (pt2, pt3) )
-						raw_points[pt2].append(tmp_idx_line)
-						raw_points[pt3].append(tmp_idx_line)
-					# raw_lines.append( (pt3, pt4) )
-					tmp_idx_line = len(raw_lines)
-					if (pt3, pt4) not in raw_lines and (pt4, pt3) not in raw_lines:
-						raw_lines.append( (pt3, pt4) )
-						raw_points[pt3].append(tmp_idx_line)
-						raw_points[pt4].append(tmp_idx_line)
-					# raw_lines.append( (pt4, pt1) )
-					tmp_idx_line = len(raw_lines)
-					if (pt4, pt1) not in raw_lines and (pt1, pt4) not in raw_lines:
-						raw_lines.append( (pt4, pt1) )
-						raw_points[pt4].append(tmp_idx_line)
-						raw_points[pt1].append(tmp_idx_line)
+				tmp_idx_line = len(raw_lines)
+				if (pt1, pt2) not in raw_lines and (pt2, pt1) not in raw_lines:
+					raw_lines.append( (pt1, pt2) )
+					raw_points[pt1].append(tmp_idx_line)
+					raw_points[pt2].append(tmp_idx_line)
+			else: # a rectangle
+				if idx_left == -1:
+					raw_points_x.append(left)
+				idx_right = self.get_closest_idx(right, raw_points_x, bias)
+				if idx_right == -1:
+					raw_points_x.append(right)
+				if idx_top == -1:
+					raw_points_y.append(top)
+				idx_bottom = self.get_closest_idx(bottom, raw_points_y, bias)
+				if idx_bottom == -1:
+					raw_points_y.append(bottom)
+				pt1 = (left, top)
+				pt2 = (right, top)
+				pt3 = (right, bottom)
+				pt4 = (left, bottom)
+				points_visited[pt1] = False
+				points_visited[pt2] = False
+				points_visited[pt3] = False
+				points_visited[pt4] = False
+				if pt1 not in raw_points:
+					raw_points[pt1] = []
+				if pt2 not in raw_points:
+					raw_points[pt2] = []
+				if pt3 not in raw_points:
+					raw_points[pt3] = []
+				if pt4 not in raw_points:
+					raw_points[pt4] = []
+				# raw_lines.append( (pt1, pt2) )
+				tmp_idx_line = len(raw_lines)
+				if (pt1, pt2) not in raw_lines and (pt2, pt1) not in raw_lines:
+					raw_lines.append( (pt1, pt2) )
+					raw_points[pt1].append(tmp_idx_line)
+					raw_points[pt2].append(tmp_idx_line)
+				# raw_lines.append( (pt2, pt3) )
+				tmp_idx_line = len(raw_lines)
+				if (pt2, pt3) not in raw_lines and (pt3, pt2) not in raw_lines:
+					raw_lines.append( (pt2, pt3) )
+					raw_points[pt2].append(tmp_idx_line)
+					raw_points[pt3].append(tmp_idx_line)
+				# raw_lines.append( (pt3, pt4) )
+				tmp_idx_line = len(raw_lines)
+				if (pt3, pt4) not in raw_lines and (pt4, pt3) not in raw_lines:
+					raw_lines.append( (pt3, pt4) )
+					raw_points[pt3].append(tmp_idx_line)
+					raw_points[pt4].append(tmp_idx_line)
+				# raw_lines.append( (pt4, pt1) )
+				tmp_idx_line = len(raw_lines)
+				if (pt4, pt1) not in raw_lines and (pt1, pt4) not in raw_lines:
+					raw_lines.append( (pt4, pt1) )
+					raw_points[pt4].append(tmp_idx_line)
+					raw_points[pt1].append(tmp_idx_line)
 		# print raw_lines
 		# print raw_points
 		# calculate the points included in a table, and the grids
@@ -1050,6 +1001,17 @@ class simplePDF2HTML(PDF2HTML):
 					break
 		# print table_line_list
 
+		def line_merge(range1, range2):
+			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
+			r1_min = min(range1)
+			r1_max = max(range1)
+			r2_min = min(range2)
+			r2_max = max(range2)
+			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0:
+				merged_range = [[min(r1_min, r2_min), max(r1_max, r2_max)]]
+			else:
+				merged_range = [range1, range2]
+			return merged_range
 		# get the regularized lines
 		for i in range(len(table_list)):
 			tmp_xs = []
