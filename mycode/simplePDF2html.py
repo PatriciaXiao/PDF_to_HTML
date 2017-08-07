@@ -956,7 +956,7 @@ class simplePDF2HTML(PDF2HTML):
 							if parser_y not in dashline_parser_ys:
 								dashline_parser_ys.append(parser_y)
 		'''
-		print dashline_parser_xs
+		# print dashline_parser_xs
 		for dashline in table_dashlines:
 			if dashline['x0'] not in dashline_parser_xs:
 				dashline_parser_xs.append(dashline['y0'])
@@ -1304,7 +1304,7 @@ class simplePDF2HTML(PDF2HTML):
 						n_tmp_col_lines = len(x_lines[tmp_x])
 						for c in range(n_tmp_col_lines):
 							tmp_idx = n_tmp_col_lines - 1 - c
-							merged_line = line_merge(x_lines[tmp_x][tmp_idx], tmp_y)
+							merged_line = line_merge(x_lines[tmp_x][tmp_idx], tmp_y, bias=bias)
 							if len(merged_line) == 1:
 								x_lines[tmp_x].pop(tmp_idx)
 								tmp_y[0] = merged_line[0][0]
@@ -1328,7 +1328,7 @@ class simplePDF2HTML(PDF2HTML):
 						n_tmp_row_lines = len(y_lines[tmp_y])
 						for r in range(n_tmp_row_lines):
 							tmp_idx = n_tmp_row_lines - 1 - r
-							merged_line = line_merge(y_lines[tmp_y][tmp_idx], tmp_x)
+							merged_line = line_merge(y_lines[tmp_y][tmp_idx], tmp_x, bias=bias)
 							if len(merged_line) == 1:
 								y_lines[tmp_y].pop(tmp_idx)
 								tmp_x[0] = merged_line[0][0]
@@ -1347,6 +1347,7 @@ class simplePDF2HTML(PDF2HTML):
 			tmp_ys = [k for k in keep_ys.keys() if keep_ys[k]]
 			tmp_xs.sort()
 			tmp_ys.sort()
+			print keep_ys[567]
 			# table list update!
 			j = len(tmp_table) - 1
 			while j >= 0:
@@ -1381,11 +1382,13 @@ class simplePDF2HTML(PDF2HTML):
 			'''
 			print tmp_xs
 			print tmp_ys
+			print len(tmp_xs), len(tmp_ys)
 			for line in tmp_lines:
 				pt1 = min(line[0], line[1])
 				pt2 = max(line[0], line[1])
 				# if 91.5 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
-				if 346 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
+				if 567 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
+					print "hello"
 					print line
 			# '''
 			# print x_lines

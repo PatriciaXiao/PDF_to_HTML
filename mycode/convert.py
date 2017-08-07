@@ -1,5 +1,6 @@
 from simplePDF2html import *
 import os
+import copy
 
 def get_HTML_fname(pdf_name):
 	parts = pdf_name.split('.')
@@ -23,7 +24,7 @@ def get_PDF_fnames(directory):
 # fname_list = ['data/table_example_1.pdf', 'data/table_example_2.pdf', 'data/table_example_3.pdf', 'data/table_example_4.pdf', 'data/table_example_5.pdf', 'data/table_example_6.pdf', 'data/table_example_7.pdf', 'data/table_example_8.pdf']
 # fname_list = ['data/table_example_8.pdf']
 # fname_list = ['data/table_example_5.pdf']
-fname_list = ['data/table_example_16.pdf'] #9 # 5 # 11 #12 # 14
+fname_list = ['data/table_example_17.pdf'] #9 # 5 # 11 #12 # 14
 #fname_list = ['data/2016-04-27-1202251320.PDF'] # table testcase
 # fname_list = ['data/2016-03-26-1202083817.PDF']
 # fname_list = ['data/2016-03-12-1202040147.PDF']
@@ -34,8 +35,26 @@ fname_list = ['data/table_example_16.pdf'] #9 # 5 # 11 #12 # 14
 # fname_list = ['data/2016-01-19-1201924052.PDF']
 # fname_list = ['data/2016-01-19-1201924054.PDF']
 # fname_list = get_PDF_fnames('data/')
+if AVOID_ERROR_STOP = False
+if AVOID_ERROR_STOP:
+	cnt_total = 0
+	cnt_success = 0
+	unsuccess = []
 for fname in fname_list:
 	with simplePDF2HTML(fname, get_HTML_fname(fname)) as test:
-		print test.pdf_path
-		test.convert()
-		
+		print "trying to convert file {0}".format(test.pdf_path)
+		if AVOID_ERROR_STOP:
+			cnt_total += 1
+			try:
+				test.convert()
+				cnt_success += 1
+			except Exception, e:
+				print "didn't successfully converted file {0}".format(test.pdf_path)
+				unsuccess.append(copy.copy(test.pdf_path))
+		else:
+			test.convert()
+if AVOID_ERROR_STOP:
+	print "successfully converted {0} files out of {1} files".format(cnt_success, cnt_total)
+	print "problematic files include: "
+	for unsuccess_name in unsuccess:
+		print "    {0}".format(unsuccess_name)
