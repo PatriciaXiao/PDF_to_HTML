@@ -736,7 +736,7 @@ class simplePDF2HTML(PDF2HTML):
 	
 
 	def get_tables(self, layout):
-		debug = True
+		debug = False #True
 		# 在debug状态画出页码的边框
 		if debug:
 			page_range = {
@@ -1401,10 +1401,10 @@ class simplePDF2HTML(PDF2HTML):
 					for idx in range(len(tmp_ys)):
 						if tmp_ys[idx] == pt1[1]:
 							start_line_idx = idx
-						elif tmp_ys[idx] == pt2[1]:
+						if tmp_ys[idx] == pt2[1]:
 							end_line_idx = idx
 							break # sorted
-					assert start_line_idx != -1 and end_line_idx != -1, "error happend when building the frame of the table"
+					assert start_line_idx != -1 and end_line_idx != -1, "unrecorded point axis {0} or {1}, not recorded in {2}".format(pt1[1], pt2[1], tmp_ys)
 					for idx in range(start_line_idx, end_line_idx):
 						tmp_pt1 = (pt1[0], tmp_ys[idx])
 						tmp_pt2 = (pt1[0], tmp_ys[idx + 1])
@@ -1417,7 +1417,7 @@ class simplePDF2HTML(PDF2HTML):
 					for idx in range(len(tmp_xs)):
 						if tmp_xs[idx] == pt1[0]:
 							start_line_idx = idx
-						elif tmp_xs[idx] == pt2[0]:
+						if tmp_xs[idx] == pt2[0]:
 							end_line_idx = idx
 							break # because it was sorted
 					'''
