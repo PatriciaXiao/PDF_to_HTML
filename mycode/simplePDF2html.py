@@ -826,9 +826,9 @@ class simplePDF2HTML(PDF2HTML):
 						table_outline_elem_lst.append(tmp_elem)
 
 		if max_stroke >= 0:
-			bias = 4 * max_stroke # 3
+			bias = 2 * max_stroke # 3
 		else:
-			bias = 7 # 5
+			bias = 3 # 5
 		# 处理一下 table_outline_elem_lst:
 		# print len(table_raw_dash_lst)
 		# print len(table_outline_elem_lst)
@@ -956,6 +956,7 @@ class simplePDF2HTML(PDF2HTML):
 							if parser_y not in dashline_parser_ys:
 								dashline_parser_ys.append(parser_y)
 		'''
+		print dashline_parser_xs
 		for dashline in table_dashlines:
 			if dashline['x0'] not in dashline_parser_xs:
 				dashline_parser_xs.append(dashline['y0'])
@@ -1058,7 +1059,7 @@ class simplePDF2HTML(PDF2HTML):
 				clean_tables_lst[tmp_table_idx].append(outline_elem.copy())
 		# 然后规范一下坐标值
 		# 开始整理表格内容
-		print "number of tables in this page is {0}".format(len(clean_tables_lst))
+		print "number of potential tables in this page is {0}".format(len(clean_tables_lst))
 		for clean_tables_lst_elem in clean_tables_lst:
 			raw_points_x = [] # contents: x
 			raw_points_y = [] # contents: y
