@@ -22,10 +22,11 @@ sys.setdefaultencoding('utf8') #设置默认编码
 
 
 class PDF2HTML(object):
-	def __init__(self, pdf_path, html_path, password="", codec='utf-8'):
+	def __init__(self, pdf_path, html_path, password="", codec='utf-8', bias_param=[1.5, 2]):
 		self.pdf_path = pdf_path
 		self.html_path = html_path
 		self.codec = codec
+		self.bias_param = bias_param
 		self.reader = open(pdf_path, 'rb')
 		self.writer = open(html_path, 'w') #'a'
 		self.debug_log = open('debug.log', 'a')
@@ -35,6 +36,7 @@ class PDF2HTML(object):
 		self.level = 0
 		self.outlines = None
 		self.outlines_dict = None
+
 		# http://webdesign.about.com/od/styleproperties/p/blspfontweight.htm
 		self.fontweight_dict = {
 			self.chinese_str('ABCDEE+黑体'): 'bold',
@@ -84,7 +86,7 @@ class PDF2HTML(object):
 	def sort_dict_by_val(self, dictdata, reverse=True):
 		return sorted(dictdata.items(), key=operator.itemgetter(1), reverse=reverse)
 
-	def convert(self):
+	def convert(self, bias_param=None):
 		pass
 
 	def writeHTML(self):
@@ -97,7 +99,9 @@ class PDF2HTML(object):
 
 class simplePDF2HTML(PDF2HTML):
 	# 转换格式主函数
-	def convert(self):
+	def convert(self, bias_param=None):
+		if bias_param:
+			self.bias_param = bias_param
 		print "initializing the parser setting..."
 		self.simpleParse()
 		# print "simple convert"
@@ -826,9 +830,9 @@ class simplePDF2HTML(PDF2HTML):
 						table_outline_elem_lst.append(tmp_elem)
 
 		if max_stroke >= 0:
-			bias = 2 * max_stroke # 3
+			bias = self.bias_param[0] * max_stroke # 3 # 2 # 1.5
 		else:
-			bias = 3 # 5
+			bias = self.bias_param[1] # 5 # 3 # 2
 		# 处理一下 table_outline_elem_lst:
 		# print len(table_raw_dash_lst)
 		# print len(table_outline_elem_lst)
@@ -1281,15 +1285,19 @@ class simplePDF2HTML(PDF2HTML):
 			keep_ys = {}
 			x_lines = {} # x: [[y1, y2], [y1', y2']...], same x, vertical
 			y_lines = {} # y: [[x1, x2], [x1', x2']...], same y, horizontal
-			for tmp_x in tmp_xs[1: len_xs - 1]:
-				keep_xs[tmp_x] = False
-			for tmp_y in tmp_ys[1: len_ys - 1]:
-				keep_ys[tmp_y] = False
 			keep_xs[tmp_xs[0]] = True
 			keep_ys[tmp_ys[0]] = True
 			keep_xs[tmp_xs[len_xs - 1]] = True
 			keep_ys[tmp_ys[len_ys - 1]] = True
+
+			for tmp_x in tmp_xs[1: len_xs - 1]:
+				keep_xs[tmp_x] = False
+			for tmp_y in tmp_ys[1: len_ys - 1]:
+				keep_ys[tmp_y] = False
+			
 			for line in tmp_lines:
+				if debug:
+					draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
 				# 找出合法的点
 				pt1 = min(line[0], line[1])
 				pt2 = max(line[0], line[1])
@@ -1347,7 +1355,6 @@ class simplePDF2HTML(PDF2HTML):
 			tmp_ys = [k for k in keep_ys.keys() if keep_ys[k]]
 			tmp_xs.sort()
 			tmp_ys.sort()
-			print keep_ys[567]
 			# table list update!
 			j = len(tmp_table) - 1
 			while j >= 0:
@@ -1441,7 +1448,7 @@ class simplePDF2HTML(PDF2HTML):
 
 
 		# test
-		#'''
+		'''
 		if debug:
 			for table in table_list:
 				for pt in table:
