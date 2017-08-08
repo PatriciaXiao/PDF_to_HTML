@@ -1,3 +1,6 @@
+#!/usr/bin/python
+#-*- coding: utf-8 -*-
+
 from simplePDF2html import *
 import os
 import copy
@@ -38,7 +41,7 @@ if COUNT:
 	cnt_total = 0
 	cnt_success = 0
 	unsuccess = []
-bias_param_list = [[1.5, 2], [2, 3], [3, 5]]
+bias_param_list = [[1.5, 2], [2, 3], [3, 5]] # 这个参数是有关于表格边线检查的容错范围的，比较重要，但是各个文档之间并不统一
 for fname in fname_list:
 	with simplePDF2HTML(fname, get_HTML_fname(fname)) as test:
 		print "trying to convert file {0}".format(test.pdf_path)
