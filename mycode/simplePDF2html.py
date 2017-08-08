@@ -814,7 +814,7 @@ class simplePDF2HTML(PDF2HTML):
 						if bottom not in dashline_parser_ys:
 							dashline_parser_ys.append(bottom)
 					elif isLine == 'point':
-						line_stroke = max(top - bottom, right - left)
+						line_stroke = min(top - bottom, right - left) # max?
 					# update data
 					if line_stroke > max_stroke:
 						max_stroke = line_stroke
