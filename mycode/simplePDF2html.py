@@ -740,47 +740,15 @@ class simplePDF2HTML(PDF2HTML):
 				break
 		return closest_idx
 	
-
-	def get_tables(self, layout):
-		debug = self.debug_mode_on #False #True
-		# 在debug状态画出页码的边框
-		if debug:
-			page_range = {
-				"left": layout.x0,
-				"right": layout.x1,
-				"top": layout.y1,
-				"bottom": layout.y0
-			}
-			offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
-			offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
-			size_x = 1.5 * (page_range["right"] - page_range["left"])
-			size_y = 1.5 * (page_range["top"] - page_range["bottom"])
-			draw = Draw(size_x, size_y, offset_x, offset_y)
-			draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
-		# get the maximum value of the line stroke width
-		def line_merge(range1, range2, bias=0):
-			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
-			r1_min = min(range1) - bias
-			r1_max = max(range1) + bias
-			r2_min = min(range2) - bias
-			r2_max = max(range2) + bias
-			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0\
-			  or (r2_min - r1_min)*(r2_min - r1_max) <=0 or (r2_max - r1_min)*(r2_max - r1_max) <=0:
-				merged_range = [[min(r1_min, r2_min) + bias, max(r1_max, r2_max) - bias]]
-			else:
-				merged_range = [range1, range2]
-			return merged_range
+	#################
+	# steps in get_tables
+	# step 1
+	def get_tables_elements(self, layout):
 		max_stroke = -1
-		raw_lines = [] # contents: ((x1, y1), (x2, y2))
-		raw_points = {} # contents: (x, y): [idx1, idx2, ...] - the index of corresponding lines
-		points_visited = {} # contents: (x, y) : True / False
-
-		
 		table_outline_elem_lst = [] # contents: {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'isLine': isLine}
 		table_raw_dash_lst = []
 		dashline_parser_xs = []
 		dashline_parser_ys = []
-		# get the max stroke width
 		for x in layout:
 			# if(isinstance(x, LTRect)):
 			if(isinstance(x, LTRect) or isinstance(x, LTFigure)):
@@ -835,15 +803,27 @@ class simplePDF2HTML(PDF2HTML):
 			bias = self.bias_param[0] * max_stroke # 3 # 2 # 1.5
 		else:
 			bias = self.bias_param[1] # 5 # 3 # 2
-		# 处理一下 table_outline_elem_lst:
-		# print len(table_raw_dash_lst)
-		# print len(table_outline_elem_lst)
+		return bias, table_outline_elem_lst, table_raw_dash_lst, dashline_parser_xs, dashline_parser_ys
 
+	# aid function
+	def line_merge(self, range1, range2, bias=0):
+		assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
+		r1_min = min(range1) - bias
+		r1_max = max(range1) + bias
+		r2_min = min(range2) - bias
+		r2_max = max(range2) + bias
+		if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0\
+		  or (r2_min - r1_min)*(r2_min - r1_max) <=0 or (r2_max - r1_min)*(r2_max - r1_max) <=0:
+			merged_range = [[min(r1_min, r2_min) + bias, max(r1_max, r2_max) - bias]]
+		else:
+			merged_range = [range1, range2]
+		return merged_range
+	# step 2
+	def get_tables_dashlines(self, table_raw_dash_lst, bias):
+		# 处理一下 table_outline_elem_lst
 		# 首先把虚线找出来连起来
-		# print len(table_raw_dash_lst)
 		raw_dashline_dot_xs = {} #(x1, x2): [idx1, idx2, ...]
 		raw_dashline_dot_ys = {} #(y1, y2): [idx1, idx2, ...]
-		
 		for i in range(len(table_raw_dash_lst)):
 			raw_dashline_dots = table_raw_dash_lst[i]
 			left = raw_dashline_dots['x0']
@@ -873,7 +853,7 @@ class simplePDF2HTML(PDF2HTML):
 				last_y_idx = len(lines_y_list) - 1
 				last_line = lines_y_list[last_y_idx]
 				# print line_merge(last_line, dot_y, bias=bias)
-				merged_result = line_merge(last_line, dot_y, bias=bias)
+				merged_result = self.line_merge(last_line, dot_y, bias=bias)
 				if len(merged_result) == 1:
 					# successfully merged
 					lines_y_list[last_y_idx][0] = merged_result[0][0]
@@ -896,11 +876,8 @@ class simplePDF2HTML(PDF2HTML):
 								'isLine': 'y'
 							}
 					table_dashlines.append(tmp_elem)
-			# if dot_x_key[0] == dot_x_key[1]:
-				# print dot_x_key
-		# print table_dashlines
-		# print raw_dashline_dot_ys
 		for dot_y_key in raw_dashline_dot_ys.keys():
+			# 对y同理
 			candidate_xs = raw_dashline_dot_ys[dot_y_key]
 			candidate_xs.sort()
 			first_line = [candidate_xs[0][0], candidate_xs[0][1]]
@@ -908,7 +885,7 @@ class simplePDF2HTML(PDF2HTML):
 			for dot_x in candidate_xs[1:]:
 				last_x_idx = len(lines_x_list) - 1
 				last_line = lines_x_list[last_x_idx]
-				merged_result = line_merge(last_line, dot_x, bias=bias)
+				merged_result = self.line_merge(last_line, dot_x, bias=bias)
 				if len(merged_result) == 1:
 					lines_x_list[last_x_idx][0] = merged_result[0][0]
 					lines_x_list[last_x_idx][1] = merged_result[0][1]
@@ -928,54 +905,9 @@ class simplePDF2HTML(PDF2HTML):
 								'isLine': 'x'
 							}
 					table_dashlines.append(tmp_elem)
-		'''
-		if debug:
-			print table_dashlines
-			for dashline in table_dashlines:
-				left = dashline['x0']
-				right = dashline['x1']
-				top = dashline['y1']
-				bottom = dashline['y0']
-				draw.square(left, right, top, bottom)
-		'''
-		# 将table_dashlines整理出交点来
-		'''
-		for dashline_x in table_dashlines:
-			if dashline_x['isLine'] == 'x':
-				if dashline_x['x0'] not in dashline_parser_xs:
-					dashline_parser_xs.append(dashline_x['x0'])
-				if dashline_x['x1'] not in dashline_parser_xs:
-					dashline_parser_xs.append(dashline_x['x1'])
-				for dashline_y in table_dashlines:
-					if dashline_y['isLine'] == 'y':
-						if dashline_y['y0'] not in dashline_parser_ys:
-							dashline_parser_ys.append(dashline_y['y0'])
-						if dashline_y['y1'] not in dashline_parser_ys:
-							dashline_parser_ys.append(dashline_y['y1'])
-						merged_x = line_merge([dashline_x['x0'], dashline_x['x1']], [dashline_y['x0'], dashline_y['x1']], bias=bias)
-						merged_y = line_merge([dashline_x['y0'], dashline_x['y1']], [dashline_y['y0'], dashline_y['y1']], bias=bias)
-						if len(merged_x) == 1 and len(merged_y) == 1:
-							parser_x = (dashline_y['x1'] + dashline_y['x0']) / 2.0
-							parser_y = (dashline_x['y1'] + dashline_x['y0']) / 2.0
-							if parser_x not in dashline_parser_xs:
-								dashline_parser_xs.append(parser_x)
-							if parser_y not in dashline_parser_ys:
-								dashline_parser_ys.append(parser_y)
-		'''
-		# print dashline_parser_xs
-		for dashline in table_dashlines:
-			if dashline['x0'] not in dashline_parser_xs:
-				dashline_parser_xs.append(dashline['y0'])
-			if dashline['x1'] not in dashline_parser_xs:
-				dashline_parser_xs.append(dashline['y1'])
-			if dashline['y0'] not in dashline_parser_ys:
-				dashline_parser_ys.append(dashline['y0'])
-			if dashline['y1'] not in dashline_parser_ys:
-				dashline_parser_ys.append(dashline['y1'])
-		dashline_parser_xs.sort()
-		dashline_parser_ys.sort()
-		# print dashline_parser_xs
-		# print dashline_parser_ys
+		return table_dashlines
+	# step 2.1: 合并dashline到其他表格边框元素列表之中
+	def get_tables_elements_all(self, table_outline_elem_lst, table_dashlines, dashline_parser_xs, dashline_parser_ys):
 		for dashline in table_dashlines:
 			if dashline['isLine'] == 'x':
 				# horizontal
@@ -1019,8 +951,9 @@ class simplePDF2HTML(PDF2HTML):
 							'y1': dashline_parser_ys[i + 1],
 							'isLine': 'y'
 						})
-
-
+		return table_outline_elem_lst
+	# step 3: 分出大致区域
+	def get_tables_areas(self, table_outline_elem_lst, bias):
 		# 粗略分出不同表格的子区域
 		clean_tables_area = [] # 每个表占的x, y范围, 内容: [[x1, x2], [y1, y2]]
 
@@ -1029,8 +962,8 @@ class simplePDF2HTML(PDF2HTML):
 			tmp_y_range = [outline_elem['y1'], outline_elem['y0']]
 			i = len(clean_tables_area) - 1
 			while i >= 0:
-				new_x_range = line_merge(clean_tables_area[i][0], tmp_x_range, bias=bias)
-				new_y_range = line_merge(clean_tables_area[i][1], tmp_y_range, bias=bias)
+				new_x_range = self.line_merge(clean_tables_area[i][0], tmp_x_range, bias=bias)
+				new_y_range = self.line_merge(clean_tables_area[i][1], tmp_y_range, bias=bias)
 				# print clean_tables_area[i][0], tmp_x_range, new_x_range
 				# print clean_tables_area[i][1], tmp_y_range, new_y_range
 				if len(new_x_range) == 1 and len(new_y_range) == 1:
@@ -1042,11 +975,6 @@ class simplePDF2HTML(PDF2HTML):
 					clean_tables_area.pop(i)
 				i -= 1
 			clean_tables_area.append([tmp_x_range, tmp_y_range])
-
-		if debug:
-			for elem in clean_tables_area:
-				draw.square(elem[0][0], elem[0][1], elem[1][0], elem[1][1])
-		# print clean_tables_area
 		clean_tables_lst = [] # grouped outline elements, contents: [elem1, elem2, ...]
 		for elem in clean_tables_area:
 			clean_tables_lst.append([])
@@ -1055,17 +983,19 @@ class simplePDF2HTML(PDF2HTML):
 			tmp_y_range = [outline_elem['y1'], outline_elem['y0']]
 			tmp_table_idx = -1
 			for i in range(len(clean_tables_area)):
-				new_x_range = line_merge(clean_tables_area[i][0], tmp_x_range, bias=bias)
-				new_y_range = line_merge(clean_tables_area[i][1], tmp_y_range, bias=bias)
+				new_x_range = self.line_merge(clean_tables_area[i][0], tmp_x_range, bias=bias)
+				new_y_range = self.line_merge(clean_tables_area[i][1], tmp_y_range, bias=bias)
 				if len(new_x_range) == 1 and len(new_y_range) == 1:
 					tmp_table_idx = i
 					break
-			# print tmp_table_idx
 			if tmp_table_idx >= 0:
 				clean_tables_lst[tmp_table_idx].append(outline_elem.copy())
-		# 然后规范一下坐标值
-		# 开始整理表格内容
-		print "number of potential tables in this page is {0}".format(len(clean_tables_lst))
+		return clean_tables_lst
+	# step 4:
+	def get_tables_raw_frame(self, clean_tables_lst, bias):
+		raw_lines = [] # contents: ((x1, y1), (x2, y2))
+		raw_points = {} # contents: (x, y): [idx1, idx2, ...] - the index of corresponding lines
+		points_visited = {} # contents: (x, y) : True / False
 		for clean_tables_lst_elem in clean_tables_lst:
 			raw_points_x = [] # contents: x
 			raw_points_y = [] # contents: y
@@ -1192,31 +1122,10 @@ class simplePDF2HTML(PDF2HTML):
 		# print raw_points
 		# calculate the points included in a table, and the grids
 		assert len(points_visited.keys()) == len(raw_points.keys()), "points amount and points list length do not match"
+		return raw_lines, raw_points, points_visited
 
-
-		
-		'''
-		if debug:
-			point_list = raw_points.copy()
-			def debug_walk(tmp_point):
-				if points_visited[tmp_point]:
-					return
-				points_visited[tmp_point] = True
-				draw.dot(tmp_point[0], tmp_point[1], size=15, color_string="green")
-				next_links = point_list[tmp_point]
-				for idx in next_links:
-					line = raw_lines[idx]
-					debug_walk(line[0])
-					debug_walk(line[1])
-			test_point = point_list.keys()[0]
-			test_value = point_list[test_point]
-			debug_walk(test_point)
-			print "debug walk done"
-		# '''
-		
-		
-
-
+	def get_tables_init_info(self, raw_points, raw_lines, points_visited):
+		'''Grouped Points and Lines'''
 		point_list = raw_points.copy()
 
 		def recursively_get_group(tmp_point):
@@ -1236,17 +1145,16 @@ class simplePDF2HTML(PDF2HTML):
 						continue
 					next_list = recursively_get_group(next_point)
 					ret_val.extend(next_list)
-					# draw.dot(next_point[0], next_point[1], size=15, color_string="green")
 						
 			return ret_val
 
-		table_list = []
+		table_list = [] # points in tables
 		table_line_list = [] # lines that belong to a specific table
 		divider_list = [] # the lines
 		while len(point_list.keys()):
 			next_starting_point = point_list.keys()[0]
 			next_group = recursively_get_group(next_starting_point)
-			if len(next_group) > 2: # not a line
+			if len(next_group) > 2: # it is a table, not a line
 				next_group.sort()
 				table_list.append(next_group)
 				divider_list.append([])
@@ -1259,7 +1167,9 @@ class simplePDF2HTML(PDF2HTML):
 					table_line_list[i].append(line)
 					break
 		# print table_line_list
+		return table_list, table_line_list, divider_list
 
+	def get_tables_divider_list(self, table_list, table_line_list, divider_list, bias):
 		# get the regularized lines
 		for i in range(len(table_list)):
 			tmp_xs = []
@@ -1298,8 +1208,6 @@ class simplePDF2HTML(PDF2HTML):
 				keep_ys[tmp_y] = False
 			
 			for line in tmp_lines:
-				if debug:
-					draw.line(line[0][0], line[0][1], line[1][0], line[1][1])
 				# 找出合法的点
 				pt1 = min(line[0], line[1])
 				pt2 = max(line[0], line[1])
@@ -1314,18 +1222,12 @@ class simplePDF2HTML(PDF2HTML):
 						n_tmp_col_lines = len(x_lines[tmp_x])
 						for c in range(n_tmp_col_lines):
 							tmp_idx = n_tmp_col_lines - 1 - c
-							merged_line = line_merge(x_lines[tmp_x][tmp_idx], tmp_y, bias=bias)
+							merged_line = self.line_merge(x_lines[tmp_x][tmp_idx], tmp_y, bias=bias)
 							if len(merged_line) == 1:
 								x_lines[tmp_x].pop(tmp_idx)
 								tmp_y[0] = merged_line[0][0]
 								tmp_y[1] = merged_line[0][1]
 						x_lines[tmp_x].append(tmp_y)
-						'''
-						if prev_tmp_y[0] != tmp_y[0] or prev_tmp_y[1] != tmp_y[1]:
-							print "changed!"
-							print prev_tmp_y[0], tmp_y[0], prev_tmp_y[1], tmp_y[1]
-							raw_input()
-						# '''
 					else:
 						x_lines[tmp_x] = [tmp_y]
 				elif pt1[1] == pt2[1]: 
@@ -1338,21 +1240,14 @@ class simplePDF2HTML(PDF2HTML):
 						n_tmp_row_lines = len(y_lines[tmp_y])
 						for r in range(n_tmp_row_lines):
 							tmp_idx = n_tmp_row_lines - 1 - r
-							merged_line = line_merge(y_lines[tmp_y][tmp_idx], tmp_x, bias=bias)
+							merged_line = self.line_merge(y_lines[tmp_y][tmp_idx], tmp_x, bias=bias)
 							if len(merged_line) == 1:
 								y_lines[tmp_y].pop(tmp_idx)
 								tmp_x[0] = merged_line[0][0]
 								tmp_x[1] = merged_line[0][1]
 						y_lines[tmp_y].append(tmp_x)
-						# print y_lines[tmp_y]
 					else:
 						y_lines[tmp_y] = [tmp_x]
-				'''
-				print x_lines
-				print y_lines
-				print "***********"
-				raw_input()
-				# '''
 			tmp_xs = [k for k in keep_xs.keys() if keep_xs[k]]
 			tmp_ys = [k for k in keep_ys.keys() if keep_ys[k]]
 			tmp_xs.sort()
@@ -1365,44 +1260,19 @@ class simplePDF2HTML(PDF2HTML):
 				j -= 1
 			# line update
 			tmp_lines = []
-			'''
-			print x_lines
-			print y_lines
-			raw_input()
-			'''
+
 			for x_line_key in x_lines.keys():
-				###
-				'''
 				x_lines[x_line_key].sort()
-				print x_lines[x_line_key]
-				raw_input()
-				# '''
-				###
 				for x_line in x_lines[x_line_key]:
 					pt1 = (x_line_key, x_line[0])
 					pt2 = (x_line_key, x_line[1])
 					tmp_lines.append((pt1, pt2))
 			for y_line_key in y_lines.keys():
+				y_lines[y_line_key].sort()
 				for y_line in y_lines[y_line_key]:
 					pt1 = (y_line[0], y_line_key)
 					pt2 = (y_line[1], y_line_key)
 					tmp_lines.append((pt1, pt2))
-			###
-			'''
-			print tmp_xs
-			print tmp_ys
-			print len(tmp_xs), len(tmp_ys)
-			for line in tmp_lines:
-				pt1 = min(line[0], line[1])
-				pt2 = max(line[0], line[1])
-				# if 91.5 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
-				if 567 in [pt1[1], pt2[1], pt1[0], pt2[0]]:
-					print "hello"
-					print line
-			# '''
-			# print x_lines
-			# print y_lines
-			###
 			# 处理分割线
 			for line in tmp_lines:
 				pt1 = min(line[0], line[1])
@@ -1433,11 +1303,6 @@ class simplePDF2HTML(PDF2HTML):
 						if tmp_xs[idx] == pt2[0]:
 							end_line_idx = idx
 							break # because it was sorted
-					'''
-					print pt1[0], pt2[0]
-					print tmp_xs
-					print len(tmp_xs), len(tmp_ys)
-					#####'''
 					assert start_line_idx != -1 and end_line_idx != -1, "error happend when building the frame of the table"
 					for idx in range(start_line_idx, end_line_idx):
 						tmp_pt1 = (tmp_xs[idx], pt1[1])
@@ -1447,6 +1312,93 @@ class simplePDF2HTML(PDF2HTML):
 				else:
 					assert False, "seems that it is not a regular table"
 			# print divider_list[i]
+			return divider_list
+	#################
+
+	def get_tables(self, layout):
+		debug = self.debug_mode_on #False #True
+		# 在debug状态画出页码的边框
+		if debug:
+			page_range = {
+				"left": layout.x0,
+				"right": layout.x1,
+				"top": layout.y1,
+				"bottom": layout.y0
+			}
+			offset_x = -1.0 * (page_range["right"] + page_range["left"]) / 2.0
+			offset_y = -1.0 * (page_range["top"] + page_range["bottom"]) / 2.0
+			size_x = 1.5 * (page_range["right"] - page_range["left"])
+			size_y = 1.5 * (page_range["top"] - page_range["bottom"])
+			draw = Draw(size_x, size_y, offset_x, offset_y)
+			draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
+		# get the maximum value of the line stroke width
+		def line_merge(range1, range2, bias=0):
+			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
+			r1_min = min(range1) - bias
+			r1_max = max(range1) + bias
+			r2_min = min(range2) - bias
+			r2_max = max(range2) + bias
+			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0\
+			  or (r2_min - r1_min)*(r2_min - r1_max) <=0 or (r2_max - r1_min)*(r2_max - r1_max) <=0:
+				merged_range = [[min(r1_min, r2_min) + bias, max(r1_max, r2_max) - bias]]
+			else:
+				merged_range = [range1, range2]
+			return merged_range
+
+		# step 1
+		bias, table_outline_elem_lst, table_raw_dash_lst, dashline_parser_xs, dashline_parser_ys = \
+			self.get_tables_elements(layout)
+
+		# step 2
+		table_dashlines = self.get_tables_dashlines(table_raw_dash_lst, bias)
+
+		for dashline in table_dashlines:
+			if dashline['x0'] not in dashline_parser_xs:
+				dashline_parser_xs.append(dashline['y0'])
+			if dashline['x1'] not in dashline_parser_xs:
+				dashline_parser_xs.append(dashline['y1'])
+			if dashline['y0'] not in dashline_parser_ys:
+				dashline_parser_ys.append(dashline['y0'])
+			if dashline['y1'] not in dashline_parser_ys:
+				dashline_parser_ys.append(dashline['y1'])
+		dashline_parser_xs.sort()
+		dashline_parser_ys.sort()
+		
+		table_outline_elem_lst = self.get_tables_elements_all(table_outline_elem_lst, table_dashlines, dashline_parser_xs, dashline_parser_ys)
+
+		# step 3: 粗略分出不同表格的子区域
+		clean_tables_lst = self.get_tables_areas(table_outline_elem_lst, bias)
+
+		# Step 4: 然后规范一下坐标值
+		# 开始整理表格内容
+		print "number of potential tables in this page is {0}".format(len(clean_tables_lst))
+		raw_lines, raw_points, points_visited = self.get_tables_raw_frame(clean_tables_lst, bias)
+
+		
+		'''
+		if debug:
+			point_list = raw_points.copy()
+			def debug_walk(tmp_point):
+				if points_visited[tmp_point]:
+					return
+				points_visited[tmp_point] = True
+				draw.dot(tmp_point[0], tmp_point[1], size=15, color_string="green")
+				next_links = point_list[tmp_point]
+				for idx in next_links:
+					line = raw_lines[idx]
+					debug_walk(line[0])
+					debug_walk(line[1])
+			test_point = point_list.keys()[0]
+			test_value = point_list[test_point]
+			debug_walk(test_point)
+			print "debug walk done"
+		# '''
+		
+		# step 5
+		table_list, table_line_list, divider_list = self.get_tables_init_info(raw_points, raw_lines, points_visited)
+
+		# step 6
+		divider_list = self.get_tables_divider_list(table_list, table_line_list, divider_list, bias)
 
 
 		# test
