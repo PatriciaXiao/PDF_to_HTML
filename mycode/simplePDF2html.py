@@ -1331,19 +1331,6 @@ class simplePDF2HTML(PDF2HTML):
 			size_y = 1.5 * (page_range["top"] - page_range["bottom"])
 			draw = Draw(size_x, size_y, offset_x, offset_y)
 			draw.square(page_range["left"], page_range["right"], page_range["top"], page_range["bottom"])
-		# get the maximum value of the line stroke width
-		def line_merge(range1, range2, bias=0):
-			assert len(range1) == 2 and len(range2) == 2, "range should be an array containing 2 elements"
-			r1_min = min(range1) - bias
-			r1_max = max(range1) + bias
-			r2_min = min(range2) - bias
-			r2_max = max(range2) + bias
-			if (r1_min - r2_min)*(r1_min - r2_max) <=0 or (r1_max - r2_min)*(r1_max - r2_max) <=0\
-			  or (r2_min - r1_min)*(r2_min - r1_max) <=0 or (r2_max - r1_min)*(r2_max - r1_max) <=0:
-				merged_range = [[min(r1_min, r2_min) + bias, max(r1_max, r2_max) - bias]]
-			else:
-				merged_range = [range1, range2]
-			return merged_range
 
 		# step 1
 		bias, table_outline_elem_lst, table_raw_dash_lst, dashline_parser_xs, dashline_parser_ys = \
